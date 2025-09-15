@@ -61,16 +61,6 @@ impl Kinematics {
             solution,
             jacobian,
         });
-
-        // === cpp code ===
-        // Eigen::MatrixXd jacobian = Eigen::MatrixXd::Zero(3, 6);
-        // jacobian.block(0, 0, 3, 3) = Eigen::Matrix3d::Identity();
-
-        // Eigen::Vector3d p = -branch_platform;
-        // jacobian.block(0, 3, 3, 3) << 0, -p.z(), p.y(), p.z(), 0, -p.x(), -p.y(),
-        //     p.x(), 0;
-        // branches.push_back({branch_platform, T_world_motor, solution, jacobian});
-        // =================
     }
 
     fn wrap_angle(angle: f64) -> f64 {
@@ -137,43 +127,5 @@ impl Kinematics {
             joint_angles[k] = Self::wrap_angle(2.0 * y.atan2(x));
         }
         joint_angles
-
-        // cpp code below
-        // Eigen::VectorXd Kinematics::inverse_kinematics(Eigen::Affine3d T_world_platform) {
-        //     Eigen::VectorXd joint_angles(branches.size());
-
-        //     double rs = motor_arm_length;
-        //     double rp = rod_length;
-
-        //     for (int k = 0; k < branches.size(); k++) {
-        //         Branch &branch = branches[k];
-
-        //         Eigen::Vector3d branch_motor = branch.T_world_motor.inverse() *
-        //                                     T_world_platform * branch.branch_platform;
-        //         double px = branch_motor.x();
-        //         double py = branch_motor.y();
-        //         double pz = branch_motor.z();
-
-        //         joint_angles[k] =
-        //             2 *
-        //             atan2(
-        //                 (2 * py * rs +
-        //                 branch.solution *
-        //                     sqrt(
-        //                         -(pow(px, 4)) - 2 * pow(px, 2) * pow(py, 2) -
-        //                         2 * pow(px, 2) * pow(pz, 2) + 2 * pow(px, 2) * pow(rp, 2) +
-        //                         2 * pow(px, 2) * pow(rs, 2) - pow(py, 4) -
-        //                         2 * pow(py, 2) * pow(pz, 2) + 2 * pow(py, 2) * pow(rp, 2) +
-        //                         2 * pow(py, 2) * pow(rs, 2) - pow(pz, 4) +
-        //                         2 * pow(pz, 2) * pow(rp, 2) - 2 * pow(pz, 2) * pow(rs, 2) -
-        //                         pow(rp, 4) + 2 * pow(rp, 2) * pow(rs, 2) - pow(rs, 4))),
-        //                 (pow(px, 2) + 2 * px * rs + pow(py, 2) + pow(pz, 2) - pow(rp, 2) +
-        //                 pow(rs, 2)));
-
-        //         joint_angles[k] = wrap_angle(joint_angles[k]);
-        //     }
-
-        //     return joint_angles;
-        // }
     }
 }
