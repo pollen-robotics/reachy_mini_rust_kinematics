@@ -1,5 +1,3 @@
-use std::collections::linked_list;
-
 use nalgebra::{Matrix3, Matrix3x6, Matrix4, Vector3};
 
 struct Branch {
@@ -100,9 +98,6 @@ impl Kinematics {
             let px = branch_motor[(0, 3)];
             let py = branch_motor[(1, 3)];
             let pz = branch_motor[(2, 3)];
-
-            // rust : y.atan2(x);
-            // cpp : atan2(y, x)
 
             let x = px.powi(2) + 2.0 * px * rs + py.powi(2) + pz.powi(2) - rp.powi(2) + rs.powi(2);
             let y = 2.0 * py * rs
