@@ -1,3 +1,83 @@
+use reachy_mini_rust_kinematics::Kinematics;
+
+// kin = rk.Kinematics(0.038, 0.09)
+// head_z_offset = 0.177
+
+// with open("motors.json", "r") as f:
+//     motors = json.load(f)
+
+// for motor in motors:
+//     kin.add_branch(
+//         np.array(motor["branch_position"]),
+//         np.linalg.inv(motor["T_motor_world"]),
+//         1 if motor["solution"] else -1,
+//     )
+
+// T_world_platform = tf.translation_matrix((0, 0, 0.177))
+// t0 = time.time()
+// for k in range(1_000):
+//     r = kin.inverse_kinematics(T_world_platform)
+// t1 = time.time()
+// print(r)
+// print(f"Total time (s): {t1 - t0:.2f}")
+// print(f"Time for ik (us): {(t1 - t0) * 1e6 / 1_000:.2f}")
+
+use serde::Deserialize;
+use std::fs;
+
+#[derive(Deserialize)]
+struct Motor {
+    branch_position: Vec<f64>,
+    T_motor_world: Vec<Vec<f64>>,
+    solution: f64,
+}
+
 fn main() {
     println!("Hello, world!");
+    let data = fs::read_to_string("motors.json").expect("Unable to read file");
+    let motors: Vec<Motor> = serde_json::from_str(&data).expect("JSON was not well-formatted");
+    let mut kinematics = Kinematics::new(0.038, 0.09);
+
+    for motor in motors {
+        let branch_position = nalgebra::Vector3::new(
+            motor.branch_position[0],
+            motor.branch_position[1],
+            motor.branch_position[2],
+        );
+        let T_motor_world = nalgebra::Matrix4::new(
+            motor.T_motor_world[0][0],
+            motor.T_motor_world[0][1],
+            motor.T_motor_world[0][2],
+            motor.T_motor_world[0][3],
+            motor.T_motor_world[1][0],
+            motor.T_motor_world[1][1],
+            motor.T_motor_world[1][2],
+            motor.T_motor_world[1][3],
+            motor.T_motor_world[2][0],
+            motor.T_motor_world[2][1],
+            motor.T_motor_world[2][2],
+            motor.T_motor_world[2][3],
+            motor.T_motor_world[3][0],
+            motor.T_motor_world[3][1],
+            motor.T_motor_world[3][2],
+            motor.T_motor_world[3][3],
+        );
+        let solution = if motor.solution != 0.0 { 1.0 } else { -1.0 };
+        kinematics.add_branch(
+            branch_position,
+            T_motor_world.try_inverse().unwrap(),
+            solution,
+        );
+    }
+
+    let t_world_platform = nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, 0.177));
+    // let t0 = std::time::Instant::now();
+    // for _ in 0..1_000 {
+    let r = kinematics.inverse_kinematics(t_world_platform);
+    println!("{:?}", r);
+    // }
+    // let t1 = std::time::Instant::now();
+    // println!("Total time (s): {}", (t1 - t0).as_secs_f64());
+    // println!("Time for ik (us): {}", (t1 - t0).as_micros());
+
 }
