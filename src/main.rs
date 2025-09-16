@@ -2,13 +2,14 @@ use reachy_mini_rust_kinematics::Kinematics;
 use serde::Deserialize;
 use std::fs;
 
+#[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct Motor {
     branch_position: Vec<f64>,
     T_motor_world: Vec<Vec<f64>>,
     solution: f64,
 }
-
+#[allow(non_snake_case)]
 fn main() {
     println!("Hello, world!");
     let data = fs::read_to_string("motors.json").expect("Unable to read file");
@@ -49,7 +50,6 @@ fn main() {
 
     let head_z_offset = 0.177;
 
-
     // Test inverse kinematics
     let t_world_platform =
         nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, head_z_offset));
@@ -58,14 +58,18 @@ fn main() {
     let r = kinematics.inverse_kinematics(t_world_platform);
     println!("Inverse kinematics {:?}", r);
 
-
     // Test forward kinematics
     kinematics.reset_forward_kinematics(t_world_platform);
     let joints = vec![0.3, 0.0, 0.0, 0.0, 0.0, 0.0];
     let mut t = kinematics.forward_kinematics(joints);
 
     // remove head_z_offset
-    // t[(2, 3)] -= head_z_offset;
-    println!("Forward kinematics {:?}", t);
-
+    t[(2, 3)] -= head_z_offset;
+    println!("Forward kinematics:");
+    for i in 0..4 {
+        for j in 0..4 {
+            print!("{:>10.6} ", t[(i, j)]);
+        }
+        println!();
+    }
 }
