@@ -334,5 +334,4 @@ fn reachy_mini_rust_kinematics(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-
 define_stub_info_gatherer!(stub_info);
