@@ -69,7 +69,6 @@ impl Kinematics {
 
     #[allow(non_snake_case)]
     pub fn inverse_kinematics(&mut self, t_world_platform: Matrix4<f64>) -> Vec<f64> {
-        // TODO octuple check this against cpp if something is acting weird
         let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len()];
         let rs = self.motor_arm_length;
         let rp = self.rod_length;
@@ -182,7 +181,7 @@ impl Kinematics {
                     let rotation = nalgebra::Rotation3::from_axis_angle(&axis, norm);
                     let linear = rotation.matrix();
                     let mut slice = T.view_mut((0, 0), (3, 3));
-                    slice.copy_from(&linear);
+                    slice.copy_from(linear);
                 }
                 let t_world_platform2 = self.t_world_platform * T;
 
