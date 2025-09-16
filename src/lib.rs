@@ -1,11 +1,17 @@
 use nalgebra::{DVector, Matrix3, Matrix3x6, Matrix4, MatrixXx6, Vector3};
 use pyo3::prelude::*;
+use pyo3_stub_gen::{
+    define_stub_info_gatherer,
+    derive::{gen_stub_pyclass, gen_stub_pymethods},
+};
 
+#[gen_stub_pyclass]
 #[pyclass(frozen)]
 struct ReachyMiniRustKinematics {
     inner: std::sync::Mutex<Kinematics>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ReachyMiniRustKinematics {
     #[new]
@@ -327,3 +333,6 @@ fn reachy_mini_rust_kinematics(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ReachyMiniRustKinematics>()?;
     Ok(())
 }
+
+
+define_stub_info_gatherer!(stub_info);
