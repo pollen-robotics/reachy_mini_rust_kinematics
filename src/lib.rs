@@ -1,4 +1,112 @@
 use nalgebra::{DVector, Matrix3, Matrix3x6, Matrix4, MatrixXx6, Vector3};
+use pyo3::prelude::*;
+
+#[pyclass(frozen)]
+struct ReachyMiniRustKinematics {
+    inner: std::sync::Mutex<Kinematics>,
+}
+
+#[pymethods]
+impl ReachyMiniRustKinematics {
+    #[new]
+    fn new(motor_arm_length: f64, rod_length: f64) -> Self {
+        Self {
+            inner: std::sync::Mutex::new(Kinematics::new(motor_arm_length, rod_length)),
+        }
+    }
+
+    fn add_branch(&self, branch_platform: [f64; 3], t_world_motor: [[f64; 4]; 4], solution: f64) {
+        let branch_platform: Vector3<f64> =
+            Vector3::new(branch_platform[0], branch_platform[1], branch_platform[2]);
+
+        let t_world_motor: Matrix4<f64> = Matrix4::new(
+            t_world_motor[0][0],
+            t_world_motor[0][1],
+            t_world_motor[0][2],
+            t_world_motor[0][3],
+            t_world_motor[1][0],
+            t_world_motor[1][1],
+            t_world_motor[1][2],
+            t_world_motor[1][3],
+            t_world_motor[2][0],
+            t_world_motor[2][1],
+            t_world_motor[2][2],
+            t_world_motor[2][3],
+            t_world_motor[3][0],
+            t_world_motor[3][1],
+            t_world_motor[3][2],
+            t_world_motor[3][3],
+        );
+        self.inner
+            .lock()
+            .unwrap()
+            .add_branch(branch_platform, t_world_motor, solution);
+    }
+
+    fn inverse_kinematics(&self, t_world_platform: [[f64; 4]; 4]) -> Vec<f64> {
+        let t_world_platform = Matrix4::new(
+            t_world_platform[0][0],
+            t_world_platform[0][1],
+            t_world_platform[0][2],
+            t_world_platform[0][3],
+            t_world_platform[1][0],
+            t_world_platform[1][1],
+            t_world_platform[1][2],
+            t_world_platform[1][3],
+            t_world_platform[2][0],
+            t_world_platform[2][1],
+            t_world_platform[2][2],
+            t_world_platform[2][3],
+            t_world_platform[3][0],
+            t_world_platform[3][1],
+            t_world_platform[3][2],
+            t_world_platform[3][3],
+        );
+        self.inner
+            .lock()
+            .unwrap()
+            .inverse_kinematics(t_world_platform)
+    }
+
+    fn reset_forward_kinematics(&self, t_world_platform: [[f64; 4]; 4]) {
+        let t_world_platform = Matrix4::new(
+            t_world_platform[0][0],
+            t_world_platform[0][1],
+            t_world_platform[0][2],
+            t_world_platform[0][3],
+            t_world_platform[1][0],
+            t_world_platform[1][1],
+            t_world_platform[1][2],
+            t_world_platform[1][3],
+            t_world_platform[2][0],
+            t_world_platform[2][1],
+            t_world_platform[2][2],
+            t_world_platform[2][3],
+            t_world_platform[3][0],
+            t_world_platform[3][1],
+            t_world_platform[3][2],
+            t_world_platform[3][3],
+        );
+        self.inner
+            .lock()
+            .unwrap()
+            .reset_forward_kinematics(t_world_platform);
+    }
+
+    fn forward_kinematics(&self, joint_angles: [f64; 6]) -> [[f64; 4]; 4] {
+        let t = self
+            .inner
+            .lock()
+            .unwrap()
+            .forward_kinematics(joint_angles.to_vec());
+        [
+            [t[(0, 0)], t[(0, 1)], t[(0, 2)], t[(0, 3)]],
+            [t[(1, 0)], t[(1, 1)], t[(1, 2)], t[(1, 3)]],
+            [t[(2, 0)], t[(2, 1)], t[(2, 2)], t[(2, 3)]],
+            [t[(3, 0)], t[(3, 1)], t[(3, 2)], t[(3, 3)]],
+        ]
+    }
+}
 
 struct Branch {
     branch_platform: Vector3<f64>,
@@ -212,4 +320,10 @@ impl Kinematics {
 
         self.t_world_platform
     }
+}
+
+#[pyo3::pymodule]
+fn reachy_mini_rust_kinematics(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<ReachyMiniRustKinematics>()?;
+    Ok(())
 }
