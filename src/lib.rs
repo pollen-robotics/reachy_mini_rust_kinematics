@@ -4,7 +4,6 @@ use pyo3_stub_gen::{
     define_stub_info_gatherer,
     derive::{gen_stub_pyclass, gen_stub_pymethods},
 };
-use serde::Deserialize;
 
 #[gen_stub_pyclass]
 #[pyclass(frozen)]
