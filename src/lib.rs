@@ -4,6 +4,7 @@ use pyo3_stub_gen::{
     define_stub_info_gatherer,
     derive::{gen_stub_pyclass, gen_stub_pymethods},
 };
+use serde::Deserialize;
 
 #[gen_stub_pyclass]
 #[pyclass(frozen)]
@@ -335,3 +336,130 @@ fn reachy_mini_rust_kinematics(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 define_stub_info_gatherer!(stub_info);
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    static HEAD_Z_OFFSET: f64 = 0.177;
+
+    #[allow(non_snake_case)]
+    #[derive(Deserialize)]
+    struct Motor {
+        branch_position: Vec<f64>,
+        T_motor_world: Vec<Vec<f64>>,
+        solution: f64,
+    }
+
+    fn initialize_kinematics() -> Kinematics {
+        let mut kinematics = Kinematics::new(0.038, 0.09);
+        let data = fs::read_to_string("motors.json").expect("Unable to read file");
+        let motors: Vec<Motor> = serde_json::from_str(&data).expect("Unable to parse JSON");
+        for motor in motors {
+            let branch_position = nalgebra::Vector3::new(
+                motor.branch_position[0],
+                motor.branch_position[1],
+                motor.branch_position[2],
+            );
+            let T_motor_world = nalgebra::Matrix4::new(
+                motor.T_motor_world[0][0],
+                motor.T_motor_world[0][1],
+                motor.T_motor_world[0][2],
+                motor.T_motor_world[0][3],
+                motor.T_motor_world[1][0],
+                motor.T_motor_world[1][1],
+                motor.T_motor_world[1][2],
+                motor.T_motor_world[1][3],
+                motor.T_motor_world[2][0],
+                motor.T_motor_world[2][1],
+                motor.T_motor_world[2][2],
+                motor.T_motor_world[2][3],
+                motor.T_motor_world[3][0],
+                motor.T_motor_world[3][1],
+                motor.T_motor_world[3][2],
+                motor.T_motor_world[3][3],
+            );
+            let solution = if motor.solution != 0.0 { 1.0 } else { -1.0 };
+            kinematics.add_branch(
+                branch_position,
+                T_motor_world.try_inverse().unwrap(),
+                solution,
+            );
+        }
+
+        // Test inverse kinematics
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+
+        kinematics.reset_forward_kinematics(t_world_platform);
+        kinematics
+    }
+
+    #[test]
+    fn test_inverse_kinematics() {
+        let mut kinematics = initialize_kinematics();
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+        let r = kinematics.inverse_kinematics(t_world_platform);
+        let expected_res = [
+            0.5469084013213722,
+            -0.6911929467384811,
+            0.6290593106168814,
+            -0.6290625053607944,
+            0.6911968541984359,
+            -0.5469156644896231,
+        ];
+        assert!(
+            r.iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
+    }
+
+    #[test]
+    fn test_forward_kinematics() {
+        let mut kinematics = initialize_kinematics();
+        let joints = vec![0.3, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut t = kinematics.forward_kinematics(joints);
+        t[(2, 3)] -= HEAD_Z_OFFSET;
+        let t_flat = t.as_slice().to_vec();
+        let expected_res = [
+            [
+                0.9500544312762279,
+                0.2784767970164817,
+                0.14088027234444309,
+                0.0,
+            ],
+            [
+                -0.303810126556134,
+                0.928527235235177,
+                0.21339301869663957,
+                0.0,
+            ],
+            [
+                -0.07138616542684614,
+                -0.24553583638638127,
+                0.9667554853403684,
+                0.0,
+            ],
+            [
+                -0.032726798589555045,
+                0.01043105987061096,
+                -0.04973316892312707,
+                1.0,
+            ],
+        ];
+        let expected_flat: Vec<f64> = expected_res
+            .iter()
+            .flat_map(|row| row.iter())
+            .copied()
+            .collect();
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_flat.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
+    }
+}
