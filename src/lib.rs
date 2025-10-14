@@ -6,7 +6,6 @@ use pyo3_stub_gen::{
 };
 use serde::Deserialize;
 
-
 const HEAD_Z_OFFSET: f64 = 0.177;
 
 #[gen_stub_pyclass]
@@ -54,7 +53,11 @@ impl ReachyMiniRustKinematics {
     }
 
     #[pyo3(signature = (t_world_platform, body_yaw=None))]
-    fn inverse_kinematics(&self, t_world_platform: [[f64; 4]; 4], body_yaw: Option<f64>) -> Vec<f64> {
+    fn inverse_kinematics(
+        &self,
+        t_world_platform: [[f64; 4]; 4],
+        body_yaw: Option<f64>,
+    ) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
             t_world_platform[0][1],
@@ -188,11 +191,14 @@ impl Kinematics {
     }
 
     #[allow(non_snake_case)]
-    pub fn inverse_kinematics(&mut self, t_world_platform: Matrix4<f64>, body_yaw: Option<f64>) -> Vec<f64> {
+    pub fn inverse_kinematics(
+        &mut self,
+        t_world_platform: Matrix4<f64>,
+        body_yaw: Option<f64>,
+    ) -> Vec<f64> {
         let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len()];
         let rs = self.motor_arm_length;
         let rp = self.rod_length;
-
 
         let mut t_world_platform_target = t_world_platform;
         // if body yaw is specified, rotate the platform accordingly
@@ -205,7 +211,6 @@ impl Kinematics {
             let t_yaw = rotation.to_homogeneous();
             t_world_platform_target = t_yaw * t_world_platform;
         }
-
 
         for (k, branch) in self.branches.iter().enumerate() {
             let t_world_motor_inv = branch.t_world_motor.try_inverse().unwrap();
@@ -263,7 +268,11 @@ impl Kinematics {
     }
 
     #[allow(non_snake_case)]
-    pub fn forward_kinematics(&mut self, joint_angles: Vec<f64>, body_yaw: Option<f64>) -> Matrix4<f64> {
+    pub fn forward_kinematics(
+        &mut self,
+        joint_angles: Vec<f64>,
+        body_yaw: Option<f64>,
+    ) -> Matrix4<f64> {
         if self.branches.len() != 6 {
             panic!("Forward kinematics requires exactly 6 joint angles");
         }
@@ -446,11 +455,10 @@ mod tests {
             0.6911968541984359,
             -0.5469156644896231,
         ];
-        assert!(
-            r.iter()
-                .zip(expected_res.iter())
-                .all(|(a, b)| (a - b).abs() < 1e-6)
-        );
+        assert!(r
+            .iter()
+            .zip(expected_res.iter())
+            .all(|(a, b)| (a - b).abs() < 1e-6));
     }
 
     #[test]
@@ -491,12 +499,10 @@ mod tests {
             .flat_map(|row| row.iter())
             .copied()
             .collect();
-        assert!(
-            t_flat
-                .iter()
-                .zip(expected_flat.iter())
-                .all(|(a, b)| (a - b).abs() < 1e-6)
-        );
+        assert!(t_flat
+            .iter()
+            .zip(expected_flat.iter())
+            .all(|(a, b)| (a - b).abs() < 1e-6));
     }
 
     // test ik + fk consistency
@@ -513,12 +519,10 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(
-            t_flat
-                .iter()
-                .zip(expected_res.iter())
-                .all(|(a, b)| (a - b).abs() < 1e-6)
-        );  
+        assert!(t_flat
+            .iter()
+            .zip(expected_res.iter())
+            .all(|(a, b)| (a - b).abs() < 1e-6));
     }
     // test ik + fk consistency with body yaw
     #[test]
@@ -535,11 +539,9 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(
-            t_flat
-                .iter()
-                .zip(expected_res.iter())
-                .all(|(a, b)| (a - b).abs() < 1e-4)
-        );
+        assert!(t_flat
+            .iter()
+            .zip(expected_res.iter())
+            .all(|(a, b)| (a - b).abs() < 1e-4));
     }
 }
