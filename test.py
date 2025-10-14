@@ -21,14 +21,30 @@ for motor in motors:
 T_world_platform = np.eye(4)
 T_world_platform[:3, 3][2] = 0.177
 # T_world_platform = tf.translation_matrix((0, 0, 0.177))
-r = kin.inverse_kinematics(T_world_platform, body_yaw=None)
+r = kin.inverse_kinematics(T_world_platform)
 print("Inverse kinematics : ", r)
 
 kin.reset_forward_kinematics(T_world_platform)
 joints = np.array([0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 
-T = np.array(kin.forward_kinematics(joints, body_yaw=None))
+T = np.array(kin.forward_kinematics(joints))
+print(T)
+T[2, 3] -= head_z_offset
+print("Forward kinematics\n", T)
+
+print("Test with a body yaw of 0.5 rad")
+
+T_world_platform = np.eye(4)
+T_world_platform[:3, 3][2] = 0.177
+r = kin.inverse_kinematics(T_world_platform, 0.5)
+print("Inverse kinematics : ", r)
+
+kin.reset_forward_kinematics(T_world_platform)
+joints = np.array([0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+
+T = np.array(kin.forward_kinematics(joints, 0.5))
 print(T)
 T[2, 3] -= head_z_offset
 print("Forward kinematics\n", T)

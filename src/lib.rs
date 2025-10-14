@@ -53,6 +53,7 @@ impl ReachyMiniRustKinematics {
             .add_branch(branch_platform, t_world_motor, solution);
     }
 
+    #[pyo3(signature = (t_world_platform, body_yaw=None))]
     fn inverse_kinematics(&self, t_world_platform: [[f64; 4]; 4], body_yaw: Option<f64>) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
@@ -103,6 +104,7 @@ impl ReachyMiniRustKinematics {
             .reset_forward_kinematics(t_world_platform);
     }
 
+    #[pyo3(signature = (joint_angles, body_yaw=None))]
     fn forward_kinematics(&self, joint_angles: [f64; 6], body_yaw: Option<f64>) -> [[f64; 4]; 4] {
         let t = self
             .inner
@@ -494,6 +496,50 @@ mod tests {
                 .iter()
                 .zip(expected_flat.iter())
                 .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
+    }
+
+    // test ik + fk consistency
+    #[test]
+    fn test_ik_fk_consistency() {
+        let mut kinematics = initialize_kinematics();
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+        let r = kinematics.inverse_kinematics(t_world_platform, None);
+        kinematics.reset_forward_kinematics(t_world_platform);
+        let mut t = kinematics.forward_kinematics(r.clone(), None);
+        for _ in 0..100 {
+            t = kinematics.forward_kinematics(r.clone(), None);
+        }
+        let t_flat = t.as_slice().to_vec();
+        let expected_res = t_world_platform.as_slice().to_vec();
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );  
+    }
+    // test ik + fk consistency with body yaw
+    #[test]
+    fn test_ik_fk_consistency_body_yaw() {
+        let body_yaw = 0.1;
+        let mut kinematics = initialize_kinematics();
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+        let r = kinematics.inverse_kinematics(t_world_platform, Some(body_yaw));
+        kinematics.reset_forward_kinematics(t_world_platform);
+        let mut t = kinematics.forward_kinematics(r.clone(), Some(body_yaw));
+        for _ in 0..100 {
+            t = kinematics.forward_kinematics(r.clone(), Some(body_yaw));
+        }
+        let t_flat = t.as_slice().to_vec();
+        let expected_res = t_world_platform.as_slice().to_vec();
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-4)
         );
     }
 }
