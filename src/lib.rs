@@ -455,10 +455,11 @@ mod tests {
             0.6911968541984359,
             -0.5469156644896231,
         ];
-        assert!(r
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            r.iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
 
     #[test]
@@ -499,10 +500,12 @@ mod tests {
             .flat_map(|row| row.iter())
             .copied()
             .collect();
-        assert!(t_flat
-            .iter()
-            .zip(expected_flat.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_flat.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
 
     // test ik + fk consistency
@@ -519,10 +522,12 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(t_flat
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
     // test ik + fk consistency with body yaw
     #[test]
@@ -539,9 +544,11 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(t_flat
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-4));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-4)
+        );
     }
 }
