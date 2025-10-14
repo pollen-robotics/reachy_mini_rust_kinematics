@@ -206,7 +206,7 @@ impl Kinematics {
             let yaw = body_yaw.unwrap();
             let rotation = nalgebra::Rotation3::from_axis_angle(
                 &nalgebra::Unit::new_normalize(Vector3::z()),
-                yaw,
+                -yaw,
             );
             let t_yaw = rotation.to_homogeneous();
             t_world_platform_target = t_yaw * t_world_platform;
@@ -363,7 +363,7 @@ impl Kinematics {
             // rotate
             let rotation = nalgebra::Rotation3::from_axis_angle(
                 &nalgebra::Unit::new_normalize(Vector3::z()),
-                -yaw,
+                yaw,
             );
             let t_yaw = rotation.to_homogeneous();
             t_world_platform = t_yaw * t_world_platform;
