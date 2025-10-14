@@ -1,6 +1,6 @@
 [package]
 name = "reachy_mini_rust_kinematics"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 
 [lib]
@@ -8,7 +8,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 env_logger = "0.11.8"
-nalgebra = "0.34.0"
+nalgebra = "0.32.3"
 pyo3 = "0.25.0"
 pyo3-log = "0.12.4"
 pyo3-stub-gen = "0.9.0"

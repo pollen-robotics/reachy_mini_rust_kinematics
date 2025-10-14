@@ -55,13 +55,13 @@ fn main() {
         nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, head_z_offset));
 
     kinematics.reset_forward_kinematics(t_world_platform);
-    let r = kinematics.inverse_kinematics(t_world_platform);
+    let r = kinematics.inverse_kinematics(t_world_platform, None);
     println!("Inverse kinematics {:?}", r);
 
     // Test forward kinematics
     kinematics.reset_forward_kinematics(t_world_platform);
     let joints = vec![0.3, 0.0, 0.0, 0.0, 0.0, 0.0];
-    let mut t = kinematics.forward_kinematics(joints);
+    let mut t = kinematics.forward_kinematics(joints, None);
 
     // remove head_z_offset
     t[(2, 3)] -= head_z_offset;

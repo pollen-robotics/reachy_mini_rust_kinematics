@@ -6,6 +6,8 @@ use pyo3_stub_gen::{
 };
 use serde::Deserialize;
 
+const HEAD_Z_OFFSET: f64 = 0.177;
+
 #[gen_stub_pyclass]
 #[pyclass(frozen)]
 struct ReachyMiniRustKinematics {
@@ -50,7 +52,12 @@ impl ReachyMiniRustKinematics {
             .add_branch(branch_platform, t_world_motor, solution);
     }
 
-    fn inverse_kinematics(&self, t_world_platform: [[f64; 4]; 4]) -> Vec<f64> {
+    #[pyo3(signature = (t_world_platform, body_yaw=None))]
+    fn inverse_kinematics(
+        &self,
+        t_world_platform: [[f64; 4]; 4],
+        body_yaw: Option<f64>,
+    ) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
             t_world_platform[0][1],
@@ -72,7 +79,7 @@ impl ReachyMiniRustKinematics {
         self.inner
             .lock()
             .unwrap()
-            .inverse_kinematics(t_world_platform)
+            .inverse_kinematics(t_world_platform, body_yaw)
     }
 
     fn reset_forward_kinematics(&self, t_world_platform: [[f64; 4]; 4]) {
@@ -100,12 +107,13 @@ impl ReachyMiniRustKinematics {
             .reset_forward_kinematics(t_world_platform);
     }
 
-    fn forward_kinematics(&self, joint_angles: [f64; 6]) -> [[f64; 4]; 4] {
+    #[pyo3(signature = (joint_angles, body_yaw=None))]
+    fn forward_kinematics(&self, joint_angles: [f64; 6], body_yaw: Option<f64>) -> [[f64; 4]; 4] {
         let t = self
             .inner
             .lock()
             .unwrap()
-            .forward_kinematics(joint_angles.to_vec());
+            .forward_kinematics(joint_angles.to_vec(), body_yaw);
         [
             [t[(0, 0)], t[(0, 1)], t[(0, 2)], t[(0, 3)]],
             [t[(1, 0)], t[(1, 1)], t[(1, 2)], t[(1, 3)]],
@@ -183,15 +191,31 @@ impl Kinematics {
     }
 
     #[allow(non_snake_case)]
-    pub fn inverse_kinematics(&mut self, t_world_platform: Matrix4<f64>) -> Vec<f64> {
+    pub fn inverse_kinematics(
+        &mut self,
+        t_world_platform: Matrix4<f64>,
+        body_yaw: Option<f64>,
+    ) -> Vec<f64> {
         let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len()];
         let rs = self.motor_arm_length;
         let rp = self.rod_length;
 
+        let mut t_world_platform_target = t_world_platform;
+        // if body yaw is specified, rotate the platform accordingly
+        if body_yaw.is_some() {
+            let yaw = body_yaw.unwrap();
+            let rotation = nalgebra::Rotation3::from_axis_angle(
+                &nalgebra::Unit::new_normalize(Vector3::z()),
+                -yaw,
+            );
+            let t_yaw = rotation.to_homogeneous();
+            t_world_platform_target = t_yaw * t_world_platform;
+        }
+
         for (k, branch) in self.branches.iter().enumerate() {
             let t_world_motor_inv = branch.t_world_motor.try_inverse().unwrap();
             let branch_motor = t_world_motor_inv
-                * t_world_platform
+                * t_world_platform_target
                 * Matrix4::new(
                     1.0,
                     0.0,
@@ -244,7 +268,11 @@ impl Kinematics {
     }
 
     #[allow(non_snake_case)]
-    pub fn forward_kinematics(&mut self, joint_angles: Vec<f64>) -> Matrix4<f64> {
+    pub fn forward_kinematics(
+        &mut self,
+        joint_angles: Vec<f64>,
+        body_yaw: Option<f64>,
+    ) -> Matrix4<f64> {
         if self.branches.len() != 6 {
             panic!("Forward kinematics requires exactly 6 joint angles");
         }
@@ -325,7 +353,25 @@ impl Kinematics {
             }
         }
 
-        self.t_world_platform
+        // prepare the retun value by applying body yaw if specified
+        let mut t_world_platform = self.t_world_platform;
+
+        // rotate the body around Z if body_yaw is specified
+        if let Some(yaw) = body_yaw {
+            // remove the z offset
+            t_world_platform[(2, 3)] -= HEAD_Z_OFFSET;
+            // rotate
+            let rotation = nalgebra::Rotation3::from_axis_angle(
+                &nalgebra::Unit::new_normalize(Vector3::z()),
+                yaw,
+            );
+            let t_yaw = rotation.to_homogeneous();
+            t_world_platform = t_yaw * t_world_platform;
+            // re-apply the z offset
+            t_world_platform[(2, 3)] += HEAD_Z_OFFSET;
+        }
+
+        t_world_platform
     }
 }
 
@@ -342,7 +388,6 @@ mod tests {
     use std::fs;
 
     use super::*;
-    static HEAD_Z_OFFSET: f64 = 0.177;
 
     #[allow(non_snake_case)]
     #[derive(Deserialize)]
@@ -401,7 +446,7 @@ mod tests {
         let mut kinematics = initialize_kinematics();
         let t_world_platform =
             nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
-        let r = kinematics.inverse_kinematics(t_world_platform);
+        let r = kinematics.inverse_kinematics(t_world_platform, None);
         let expected_res = [
             0.5469084013213722,
             -0.6911929467384811,
@@ -421,7 +466,7 @@ mod tests {
     fn test_forward_kinematics() {
         let mut kinematics = initialize_kinematics();
         let joints = vec![0.3, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let mut t = kinematics.forward_kinematics(joints);
+        let mut t = kinematics.forward_kinematics(joints, None);
         t[(2, 3)] -= HEAD_Z_OFFSET;
         let t_flat = t.as_slice().to_vec();
         let expected_res = [
@@ -460,6 +505,50 @@ mod tests {
                 .iter()
                 .zip(expected_flat.iter())
                 .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
+    }
+
+    // test ik + fk consistency
+    #[test]
+    fn test_ik_fk_consistency() {
+        let mut kinematics = initialize_kinematics();
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+        let r = kinematics.inverse_kinematics(t_world_platform, None);
+        kinematics.reset_forward_kinematics(t_world_platform);
+        let mut t = kinematics.forward_kinematics(r.clone(), None);
+        for _ in 0..100 {
+            t = kinematics.forward_kinematics(r.clone(), None);
+        }
+        let t_flat = t.as_slice().to_vec();
+        let expected_res = t_world_platform.as_slice().to_vec();
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
+    }
+    // test ik + fk consistency with body yaw
+    #[test]
+    fn test_ik_fk_consistency_body_yaw() {
+        let body_yaw = 0.1;
+        let mut kinematics = initialize_kinematics();
+        let t_world_platform =
+            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
+        let r = kinematics.inverse_kinematics(t_world_platform, Some(body_yaw));
+        kinematics.reset_forward_kinematics(t_world_platform);
+        let mut t = kinematics.forward_kinematics(r.clone(), Some(body_yaw));
+        for _ in 0..100 {
+            t = kinematics.forward_kinematics(r.clone(), Some(body_yaw));
+        }
+        let t_flat = t.as_slice().to_vec();
+        let expected_res = t_world_platform.as_slice().to_vec();
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-4)
         );
     }
 }
