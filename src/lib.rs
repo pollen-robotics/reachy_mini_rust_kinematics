@@ -56,7 +56,7 @@ impl ReachyMiniRustKinematics {
     fn inverse_kinematics(
         &self,
         t_world_platform: [[f64; 4]; 4],
-        body_yaw: Option<f64>,
+        body_yaw: Option<f64>
     ) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
@@ -121,6 +121,39 @@ impl ReachyMiniRustKinematics {
             [t[(3, 0)], t[(3, 1)], t[(3, 2)], t[(3, 3)]],
         ]
     }
+
+    #[pyo3(signature = (t_world_platform, body_yaw=None, max_relative_yaw=None, max_body_yaw=None))]
+    fn inverse_kinematics_safe(
+        &self,
+        t_world_platform: [[f64; 4]; 4],
+        body_yaw: Option<f64>,
+        max_relative_yaw: Option<f64>,
+        max_body_yaw: Option<f64>,
+    ) -> Vec<f64> {
+        let t_world_platform = Matrix4::new(
+            t_world_platform[0][0],
+            t_world_platform[0][1],
+            t_world_platform[0][2],
+            t_world_platform[0][3],
+            t_world_platform[1][0],
+            t_world_platform[1][1],
+            t_world_platform[1][2],
+            t_world_platform[1][3],
+            t_world_platform[2][0],
+            t_world_platform[2][1],
+            t_world_platform[2][2],
+            t_world_platform[2][3],
+            t_world_platform[3][0],
+            t_world_platform[3][1],
+            t_world_platform[3][2],
+            t_world_platform[3][3],
+        );
+        self.inner
+            .lock()
+            .unwrap()
+            .inverse_kinematics_safe(t_world_platform, body_yaw, max_relative_yaw, max_body_yaw)
+    }
+
 }
 
 struct Branch {
@@ -136,6 +169,7 @@ pub struct Kinematics {
     t_world_platform: Matrix4<f64>,
     line_search_maximum_iterations: usize,
     branches: Vec<Branch>,
+    body_yaw: f64,
 }
 
 impl Kinematics {
@@ -150,6 +184,7 @@ impl Kinematics {
             t_world_platform,
             line_search_maximum_iterations,
             branches,
+            body_yaw: 0.0,
         }
     }
 
@@ -190,17 +225,57 @@ impl Kinematics {
                 * ((angle + std::f64::consts::PI) * (1.0 / (2.0 * std::f64::consts::PI))).floor()
     }
 
+
+    pub fn inverse_kinematics_safe(
+        &mut self,
+        t_world_platform: Matrix4<f64>,
+        body_yaw: Option<f64>,
+        max_relative_yaw: Option<f64>,
+        max_body_yaw: Option<f64>,
+    ) -> Vec<f64> {
+        
+        let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len()+1];
+        let mut body_yaw_target = 0.0;
+        // if body yaw is specified, rotate the platform accordingly
+        if body_yaw.is_some() {
+            body_yaw_target = body_yaw.unwrap();
+            // first verify if the body yaw is within the allowed limits
+            // relative yaw is the yaw difference between the current platform yaw and body yaw
+            // it should stays within +/- max_relative_yaw
+            if let Some(max_rel_yaw) = max_relative_yaw {
+                let current_yaw = t_world_platform[(0, 1)].atan2(t_world_platform[(0, 0)]);
+                let relative_yaw = body_yaw_target - current_yaw;
+                body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw, max_rel_yaw);
+                body_yaw_target = -body_yaw_target; 
+            }
+            // then clamp the body yaw within +/- max_body_yaw
+            // this is physically limited by the mechanical design
+            if let Some(max_body_yaw) = max_body_yaw {
+                body_yaw_target = body_yaw_target.clamp(-max_body_yaw, max_body_yaw);
+            }
+        }
+
+        // construct the joint angles vector
+        joint_angles[0] = body_yaw_target;
+        joint_angles[1..].copy_from_slice(&self.inverse_kinematics(
+            t_world_platform,
+            Some(body_yaw_target)
+        ));
+        joint_angles
+    }
+
     #[allow(non_snake_case)]
     pub fn inverse_kinematics(
         &mut self,
         t_world_platform: Matrix4<f64>,
-        body_yaw: Option<f64>,
+        body_yaw: Option<f64>
     ) -> Vec<f64> {
         let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len()];
         let rs = self.motor_arm_length;
         let rp = self.rod_length;
 
         let mut t_world_platform_target = t_world_platform;
+        
         // if body yaw is specified, rotate the platform accordingly
         if body_yaw.is_some() {
             let yaw = body_yaw.unwrap();
@@ -211,6 +286,7 @@ impl Kinematics {
             let t_yaw = rotation.to_homogeneous();
             t_world_platform_target = t_yaw * t_world_platform;
         }
+        
 
         for (k, branch) in self.branches.iter().enumerate() {
             let t_world_motor_inv = branch.t_world_motor.try_inverse().unwrap();
