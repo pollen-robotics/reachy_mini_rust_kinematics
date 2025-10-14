@@ -435,7 +435,7 @@ mod tests {
         let mut kinematics = initialize_kinematics();
         let t_world_platform =
             nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, HEAD_Z_OFFSET));
-        let r = kinematics.inverse_kinematics(t_world_platform);
+        let r = kinematics.inverse_kinematics(t_world_platform, None);
         let expected_res = [
             0.5469084013213722,
             -0.6911929467384811,
