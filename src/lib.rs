@@ -245,7 +245,6 @@ impl Kinematics {
                 let current_yaw = t_world_platform[(0, 1)].atan2(t_world_platform[(0, 0)]);
                 let relative_yaw = body_yaw_target - current_yaw;
                 body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw, max_rel_yaw);
-                body_yaw_target = body_yaw_target;
             }
             // then clamp the body yaw within +/- max_body_yaw
             // this is physically limited by the mechanical design
