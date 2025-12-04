@@ -237,7 +237,7 @@ impl Kinematics {
         let mut body_yaw_target = 0.0;
         // if body yaw is specified, rotate the platform accordingly
         if body_yaw.is_some() {
-            body_yaw_target = body_yaw.unwrap();
+            body_yaw_target = -body_yaw.unwrap();
             // first verify if the body yaw is within the allowed limits
             // relative yaw is the yaw difference between the current platform yaw and body yaw
             // it should stays within +/- max_relative_yaw
@@ -245,13 +245,14 @@ impl Kinematics {
                 let current_yaw = t_world_platform[(0, 1)].atan2(t_world_platform[(0, 0)]);
                 let relative_yaw = body_yaw_target - current_yaw;
                 body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw, max_rel_yaw);
-                body_yaw_target = -body_yaw_target;
+                body_yaw_target = body_yaw_target;
             }
             // then clamp the body yaw within +/- max_body_yaw
             // this is physically limited by the mechanical design
             if let Some(max_body_yaw) = max_body_yaw {
                 body_yaw_target = body_yaw_target.clamp(-max_body_yaw, max_body_yaw);
             }
+            body_yaw_target = -body_yaw_target;
         }
 
         // construct the joint angles vector
