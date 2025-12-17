@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reachy Mini Kinematics - WASM Example</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .example-section {
+            background: #f9f9f9;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #f44336;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            padding: 5px;
+            width: 100px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Reachy Mini Kinematics - WASM Example</h1>
+        
+        <div id="loading">
+            <p>Loading WASM module and kinematics data...</p>
+        </div>
+
+        <div id="content" style="display: none;">
+            <p>This example demonstrates the Reachy Mini kinematics library compiled to WebAssembly.</p>
+
+            <div class="example-section">
+                <h2>1. Inverse Kinematics (IK)</h2>
+                <p>Calculate joint angles from desired platform pose</p>
+                <div class="input-group">
+                    <label>Body Yaw (rad):</label>
+                    <input type="number" id="ik-body-yaw" value="0.0" step="0.1">
+                    <small>(Leave as NaN for no body yaw)</small>
+                </div>
+                <button onclick="runInverseKinematics()">Run IK</button>
+                <div id="ik-output" class="output"></div>
+            </div>
+
+            <div class="example-section">
+                <h2>2. Forward Kinematics (FK)</h2>
+                <p>Calculate platform pose from joint angles</p>
+                <div class="input-group">
+                    <label>Joint 1 (rad):</label>
+                    <input type="number" id="fk-j1" value="0.3" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Joints 2-6 (rad):</label>
+                    <input type="number" id="fk-j2" value="0.0" step="0.1">
+                </div>
+                <button onclick="runForwardKinematics()">Run FK</button>
+                <div id="fk-output" class="output"></div>
+            </div>
+
+            <div class="example-section">
+                <h2>3. Safe IK with Limits</h2>
+                <p>IK with joint limit constraints</p>
+                <div class="input-group">
+                    <label>Body Yaw (rad):</label>
+                    <input type="number" id="safe-body-yaw" value="0.1" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Max Rel Yaw (rad):</label>
+                    <input type="number" id="safe-max-rel" value="0.5" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Max Body Yaw (rad):</label>
+                    <input type="number" id="safe-max-body" value="0.8" step="0.1">
+                </div>
+                <button onclick="runSafeIK()">Run Safe IK</button>
+                <div id="safe-output" class="output"></div>
+            </div>
+
+            <div class="example-section">
+                <h2>4. Passive Joints Calculation</h2>
+                <p>Calculate passive joint angles from head state</p>
+                <button onclick="runPassiveJoints()">Calculate Passive Joints</button>
+                <div id="passive-output" class="output"></div>
+            </div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        import init, { WasmKinematics } from './pkg/reachy_mini_rust_kinematics.js';
+
+        let kinematics = null;
+
+        async function loadKinematics() {
+            try {
+                // Initialize WASM module
+                await init();
+                
+                // Load kinematics configuration
+                const response = await fetch('./kinematics_data.json');
+                const jsonData = await response.text();
+                
+                // Create kinematics solver
+                kinematics = new WasmKinematics(jsonData);
+                
+                // Hide loading, show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+                console.log('Kinematics loaded successfully!');
+            } catch (err) {
+                showError('Failed to load kinematics: ' + err.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Identity matrix at head height (0.177m)
+        function getIdentityPose() {
+            return new Float64Array([
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0.177,
+                0, 0, 0, 1
+            ]);
+        }
+
+        window.runInverseKinematics = function() {
+            const output = document.getElementById('ik-output');
+            try {
+                const pose = getIdentityPose();
+                const bodyYawInput = parseFloat(document.getElementById('ik-body-yaw').value);
+                const bodyYaw = isNaN(bodyYawInput) ? NaN : bodyYawInput;
+                const jointAngles = kinematics.inverseKinematics(pose, bodyYaw);
+                
+                output.textContent = `Input pose (4x4 matrix at z=0.177):\n` +
+                    `[1, 0, 0, 0]\n[0, 1, 0, 0]\n[0, 0, 1, 0.177]\n[0, 0, 0, 1]\n\n` +
+                    `Body yaw: ${bodyYaw} rad\n\n` +
+                    `Joint angles (6 values):\n`;
+                jointAngles.forEach((item, index) => 
+                        output.textContent +=`Joint ${index+1}: ${item.toFixed(6)} rad\n`
+                    );
+            } catch (err) {
+                output.textContent = 'Error: ' + err.message;
+            }
+        };
+
+        window.runForwardKinematics = function() {
+            const output = document.getElementById('fk-output');
+            try {
+                const j1 = parseFloat(document.getElementById('fk-j1').value);
+                const j2to6 = parseFloat(document.getElementById('fk-j2').value);
+                const jointAngles = new Float64Array([j1, j2to6, j2to6, j2to6, j2to6, j2to6]);
+                
+                // Reset FK state first
+                kinematics.resetForwardKinematics(getIdentityPose());
+                
+                const pose = kinematics.forwardKinematics(jointAngles, NaN);
+                
+                output.textContent = `Input joint angles:\n`
+            
+                jointAngles.forEach((angle, i) => output.textContent += `  Joint ${i+1}: ${angle.toFixed(3)} rad\n`);
+                output.textContent += `\n\nResulting platform pose (4x4 matrix):\n` +
+                    `[${pose.slice(0, 4).map(v => v.toFixed(4)).join(', ')}]\n` +
+                    `[${pose.slice(4, 8).map(v => v.toFixed(4)).join(', ')}]\n` +
+                    `[${pose.slice(8, 12).map(v => v.toFixed(4)).join(', ')}]\n` +
+                    `[${pose.slice(12, 16).map(v => v.toFixed(4)).join(', ')}]`;
+            } catch (err) {
+                output.textContent = 'Error: ' + err.message;
+            }
+        };
+
+        window.runSafeIK = function() {
+            const output = document.getElementById('safe-output');
+            try {
+                const pose = getIdentityPose();
+                const bodyYaw = parseFloat(document.getElementById('safe-body-yaw').value);
+                const maxRelYaw = parseFloat(document.getElementById('safe-max-rel').value);
+                const maxBodyYaw = parseFloat(document.getElementById('safe-max-body').value);
+                
+                const result = kinematics.inverseKinematicsSafe(
+                    pose, bodyYaw, maxRelYaw, maxBodyYaw
+                );
+                
+                output.textContent = `Constraints:\n` +
+                    `  Body yaw: ${bodyYaw} rad\n` +
+                    `  Max relative yaw: ${maxRelYaw} rad\n` +
+                    `  Max body yaw: ${maxBodyYaw} rad\n\n` +
+                    `Result (7 values):\n` +
+                    `  Body yaw target: ${result[0].toFixed(6)} rad\n`
+                result.slice(1).forEach((item, index) => 
+                    output.textContent +=`  Joint ${index+1}: ${item.toFixed(6)} rad\n`
+                );
+            } catch (err) {
+                output.textContent = 'Error: ' + err.message;
+            }
+        };
+
+        window.runPassiveJoints = function() {
+            const output = document.getElementById('passive-output');
+            try {
+                // Head joints: [yaw_body, stewart_1, ..., stewart_6]
+                const headJoints = new Float64Array([0, 0, 0, 0, 0, 0, 0]);
+                
+                // Identity head pose
+                const headPose = new Float64Array([
+                    1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 1
+                ]);
+                
+                const passiveJoints = kinematics.calculatePassiveJoints(headJoints, headPose);
+                
+                output.textContent = `Input:\n` +
+                    `  Head joints (7): all zeros\n` +
+                    `  Head pose: identity matrix\n\n` +
+                    `Passive joints (21 values - 7 joints × 3 DOF):\n`;
+                
+                for (let i = 0; i < 7; i++) {
+                    const x = passiveJoints[i*3];
+                    const y = passiveJoints[i*3 + 1];
+                    const z = passiveJoints[i*3 + 2];
+                    output.textContent += `  Joint ${i+1}: x=${x.toFixed(6)}, y=${y.toFixed(6)}, z=${z.toFixed(6)}\n`;
+                }
+            } catch (err) {
+                output.textContent = 'Error: ' + err.message;
+            }
+        };
+
+        // Load on page load
+        loadKinematics();
+    </script>
+</body>
+</html>

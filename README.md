@@ -21,3 +21,5 @@ cd `target/wheels`
 pip install reachy_mini_rust_kinematics...
 ```
 
+## WASM Build Instructions
+See [WASM_BUILD.md](WASM_BUILD.md)
