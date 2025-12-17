@@ -156,19 +156,26 @@
     <script type="module">
         import init, { WasmKinematics } from './pkg/reachy_mini_rust_kinematics.js';
 
+        console.log('Starting Reachy Mini Kinematics WASM example...');
         let kinematics = null;
 
         async function loadKinematics() {
             try {
                 // Initialize WASM module
                 await init();
+                console.log('WASM module initialized');
                 
-                // Load kinematics configuration
+                // Load kinematics configuration from JSON file
                 const response = await fetch('./kinematics_data.json');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch kinematics_data.json: ${response.statusText}`);
+                }
                 const jsonData = await response.text();
+                console.log('Kinematics data loaded');
                 
-                // Create kinematics solver
+                // Create kinematics solver with JSON string
                 kinematics = new WasmKinematics(jsonData);
+                console.log('Kinematics module initialized');
                 
                 // Hide loading, show content
                 document.getElementById('loading').style.display = 'none';
@@ -177,6 +184,7 @@
                 console.log('Kinematics loaded successfully!');
             } catch (err) {
                 showError('Failed to load kinematics: ' + err.message);
+                console.error(err);
             }
         }
 

@@ -1,4 +1,4 @@
-use reachy_mini_rust_kinematics::Kinematics;
+use reachy_mini_rust_kinematics::kinematics::Kinematics;
 use serde::Deserialize;
 use std::fs;
 
@@ -14,7 +14,7 @@ fn main() {
     println!("Hello, world!");
     let data = fs::read_to_string("motors.json").expect("Unable to read file");
     let motors: Vec<Motor> = serde_json::from_str(&data).expect("JSON was not well-formatted");
-    let mut kinematics = Kinematics::new(0.038, 0.09);
+    let mut kinematics = Kinematics::new(0.038, 0.09, 0.177);
 
     for motor in motors {
         let branch_position = nalgebra::Vector3::new(

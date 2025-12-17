@@ -14,6 +14,8 @@ pip install maturin
 pip install -e . --verbose
 ```
 
+See the examples in the `examples/` directory.
+
 ## To install the wheel
 
 ```bash
@@ -22,4 +24,28 @@ pip install reachy_mini_rust_kinematics...
 ```
 
 ## WASM Build Instructions
+
+## Prerequisites
+
+Install `wasm-pack`:
+```bash
+cargo install wasm-pack
+```
+
+## Building for WASM
+
+Build the WASM module with the wasm feature enabled:
+
+```bash
+wasm-pack build --target web --no-default-features --features wasm
+```
+
+Or for Node.js:
+```bash
+wasm-pack build --target nodejs --no-default-features --features wasm
+```
+
+This will generate files in the `pkg/` directory.
+
 See [WASM_BUILD.md](WASM_BUILD.md)
+Also see an example in [examples](./examples/wasm_example.html)
