@@ -50,7 +50,7 @@ pub fn euler_from_rotation_xyz(r: &Matrix3<f64>) -> [f64; 3] {
 
 /// Align vectors: find rotation that aligns 'from' to 'to'
 /// Similar to scipy.spatial.transform.Rotation.align_vectors
-pub  fn align_vectors(from: &Vector3<f64>, to: &Vector3<f64>) -> Matrix3<f64> {
+pub fn align_vectors(from: &Vector3<f64>, to: &Vector3<f64>) -> Matrix3<f64> {
     let from_n = from.normalize();
     let to_n = to.normalize();
 

@@ -3,14 +3,13 @@ use serde::Deserialize;
 use std::fs;
 
 use super::euler_utils::{
-    align_vectors, euler_from_rotation_xyz, rotation_from_euler_xyz, euler_from_rotation_zyz,
+    align_vectors, euler_from_rotation_xyz, euler_from_rotation_zyz, rotation_from_euler_xyz,
     rotation_from_euler_zyz,
 };
 
 pub const HEAD_Z_OFFSET: f64 = 0.177;
 pub const STEWARD_ROD_LENGTH: f64 = 0.09;
 pub const MOTOR_ARM_LENGTH: f64 = 0.04;
-
 
 struct Branch {
     branch_platform: Vector3<f64>,
@@ -20,7 +19,6 @@ struct Branch {
     limits: Option<(f64, f64)>,
 }
 
-
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct Motor {
@@ -29,7 +27,6 @@ struct Motor {
     solution: f64,
     limits: Vec<f64>,
 }
-
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
@@ -72,7 +69,7 @@ pub struct Kinematics {
     t_world_platform: Matrix4<f64>,
     line_search_maximum_iterations: usize,
     branches: Vec<Branch>,
-    passives: PassiveKinematics
+    passives: PassiveKinematics,
 }
 
 impl Kinematics {
@@ -93,7 +90,7 @@ impl Kinematics {
             t_world_platform,
             line_search_maximum_iterations,
             branches,
-            passives
+            passives,
         }
     }
 
@@ -151,7 +148,7 @@ impl Kinematics {
 
     pub fn inverse_kinematics_safe(
         &mut self,
-    t_world_platform: Matrix4<f64>,
+        t_world_platform: Matrix4<f64>,
         body_yaw: Option<f64>,
         max_relative_yaw: Option<f64>,
         max_body_yaw: Option<f64>,
@@ -170,15 +167,16 @@ impl Kinematics {
                 let z_pos = t_world_platform[(2, 3)] - self.head_z_offset;
                 let mut max_rel_yaw_adapt = max_rel_yaw;
                 // reduce progressively max_relative_yaw to 0 at - 4cm
-                if (z_pos < 0.0) && (z_pos >= -0.04 ){
-                    max_rel_yaw_adapt = (0.04 + z_pos)/0.04 * max_rel_yaw;
-                }else if z_pos < -0.04 {
+                if (z_pos < 0.0) && (z_pos >= -0.04) {
+                    max_rel_yaw_adapt = (0.04 + z_pos) / 0.04 * max_rel_yaw;
+                } else if z_pos < -0.04 {
                     max_rel_yaw_adapt = 0.0;
                 }
 
                 let current_yaw = t_world_platform[(0, 1)].atan2(t_world_platform[(0, 0)]);
                 let relative_yaw = body_yaw_target - current_yaw;
-                body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw_adapt, max_rel_yaw_adapt);
+                body_yaw_target =
+                    current_yaw + relative_yaw.clamp(-max_rel_yaw_adapt, max_rel_yaw_adapt);
             }
             // then clamp the body yaw within +/- max_body_yaw
             // this is physically limited by the mechanical design
@@ -195,13 +193,14 @@ impl Kinematics {
             let rotation = t_world_platform.fixed_view::<3, 3>(0, 0).into_owned();
             // Convert to ZYZ Euler angles
             let mut euler_angles = euler_from_rotation_zyz(&rotation);
-            
+
             // Clamp the middle angle (beta) within [-max_angle, max_angle]
             euler_angles[1] = euler_angles[1].clamp(-max_angle, max_angle);
-            
+
             // Convert back to rotation matrix
-            let clamped_rotation = rotation_from_euler_zyz(euler_angles[0], euler_angles[1], euler_angles[2]);
-            
+            let clamped_rotation =
+                rotation_from_euler_zyz(euler_angles[0], euler_angles[1], euler_angles[2]);
+
             // Update the transform with the clamped rotation
             for i in 0..3 {
                 for j in 0..3 {
@@ -209,20 +208,20 @@ impl Kinematics {
                 }
             }
         }
-        
+
         // construct the joint angles vector
         joint_angles[0] = body_yaw_target;
-        joint_angles[1..]
-            .copy_from_slice(&self.inverse_kinematics(t_world_platform_clamped, Some(body_yaw_target)));
-        
-        
+        joint_angles[1..].copy_from_slice(
+            &self.inverse_kinematics(t_world_platform_clamped, Some(body_yaw_target)),
+        );
+
         // clamp each joint angle within its limits if specified
         for (i, branch) in self.branches.iter().enumerate() {
             if let Some((min_limit, max_limit)) = branch.limits {
                 joint_angles[i + 1] = joint_angles[i + 1].clamp(min_limit, max_limit);
             }
         }
-        
+
         joint_angles
     }
 
@@ -418,21 +417,20 @@ impl Kinematics {
     /// # Returns
     /// Result containing the initialized Kinematics instance or an error message
     pub fn from_json_file(path: &str) -> Result<Self, String> {
-        let data = fs::read_to_string(path)
-            .map_err(|e| format!("Unable to read file: {}", e))?;
+        let data = fs::read_to_string(path).map_err(|e| format!("Unable to read file: {}", e))?;
         Self::from_json_string(&data)
     }
 
     /// Create a Kinematics instance from a JSON string
-    /// 
+    ///
     /// # Arguments
     /// * `json_data` - JSON string containing kinematics configuration
-    /// 
+    ///
     /// # Returns
     /// Result containing the initialized Kinematics instance or an error message
     pub fn from_json_string(json_data: &str) -> Result<Self, String> {
-        let data_deserialized: serde_json::Value = serde_json::from_str(json_data)
-            .map_err(|e| format!("Unable to parse JSON: {}", e))?;
+        let data_deserialized: serde_json::Value =
+            serde_json::from_str(json_data).map_err(|e| format!("Unable to parse JSON: {}", e))?;
 
         let rod_length = data_deserialized["rod_length"]
             .as_f64()
@@ -450,7 +448,7 @@ impl Kinematics {
 
         let motors: Vec<Motor> = serde_json::from_str(&data_deserialized["motors"].to_string())
             .map_err(|e| format!("Unable to parse motors: {}", e))?;
-        
+
         for motor in motors {
             let branch_position = Vector3::new(
                 motor.branch_position[0],
@@ -486,12 +484,13 @@ impl Kinematics {
                 branch_position,
                 t_motor_world.try_inverse().unwrap(),
                 solution,
-                limits
+                limits,
             );
         }
 
-        let passives: PassiveKinematics = serde_json::from_str(&data_deserialized["passive_joint_kinematics"].to_string())
-            .map_err(|e| format!("Unable to parse passives: {}", e))?;
+        let passives: PassiveKinematics =
+            serde_json::from_str(&data_deserialized["passive_joint_kinematics"].to_string())
+                .map_err(|e| format!("Unable to parse passives: {}", e))?;
 
         kinematics.init_passive_kinematics(
             passives.t_xl330_in_platform_frame,
@@ -499,7 +498,8 @@ impl Kinematics {
             passives.stewart_rod_direction_in_passive_frame,
         );
 
-        let t_world_platform = Matrix4::new_translation(&Vector3::new(0.0, 0.0, kinematics.head_z_offset));
+        let t_world_platform =
+            Matrix4::new_translation(&Vector3::new(0.0, 0.0, kinematics.head_z_offset));
         kinematics.reset_forward_kinematics(t_world_platform);
 
         Ok(kinematics)
@@ -674,7 +674,6 @@ impl Kinematics {
     }
 }
 
-
 pub fn create_solver() -> Kinematics {
     Kinematics::from_json_file("kinematics_data.json")
         .expect("Failed to create solver from kinematics_data.json")
@@ -693,8 +692,11 @@ mod tests {
     #[test]
     fn test_inverse_kinematics() {
         let mut kinematics = initialize_kinematics();
-        let t_world_platform =
-            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, kinematics.head_z_offset));
+        let t_world_platform = nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(
+            0.0,
+            0.0,
+            kinematics.head_z_offset,
+        ));
         let r = kinematics.inverse_kinematics(t_world_platform, None);
         println!("IK result: {:?}", r);
         let expected_res = [
@@ -705,10 +707,11 @@ mod tests {
             0.6265371961549008,
             -0.62653923545576,
         ];
-        assert!(r
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            r.iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
 
     #[test]
@@ -749,18 +752,23 @@ mod tests {
             .flat_map(|row| row.iter())
             .copied()
             .collect();
-        assert!(t_flat
-            .iter()
-            .zip(expected_flat.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_flat.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
 
     // test ik + fk consistency
     #[test]
     fn test_ik_fk_consistency() {
         let mut kinematics = initialize_kinematics();
-        let t_world_platform =
-            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, kinematics.head_z_offset));
+        let t_world_platform = nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(
+            0.0,
+            0.0,
+            kinematics.head_z_offset,
+        ));
         let r = kinematics.inverse_kinematics(t_world_platform, None);
         kinematics.reset_forward_kinematics(t_world_platform);
         let mut t = kinematics.forward_kinematics(r.clone(), None);
@@ -769,18 +777,23 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(t_flat
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-6)
+        );
     }
     // test ik + fk consistency with body yaw
     #[test]
     fn test_ik_fk_consistency_body_yaw() {
         let body_yaw = 0.1;
         let mut kinematics = initialize_kinematics();
-        let t_world_platform =
-            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(0.0, 0.0, kinematics.head_z_offset));
+        let t_world_platform = nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(
+            0.0,
+            0.0,
+            kinematics.head_z_offset,
+        ));
         let r = kinematics.inverse_kinematics(t_world_platform, Some(body_yaw));
         kinematics.reset_forward_kinematics(t_world_platform);
         let mut t = kinematics.forward_kinematics(r.clone(), Some(body_yaw));
@@ -789,10 +802,12 @@ mod tests {
         }
         let t_flat = t.as_slice().to_vec();
         let expected_res = t_world_platform.as_slice().to_vec();
-        assert!(t_flat
-            .iter()
-            .zip(expected_res.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-4));
+        assert!(
+            t_flat
+                .iter()
+                .zip(expected_res.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-4)
+        );
     }
 
     #[test]

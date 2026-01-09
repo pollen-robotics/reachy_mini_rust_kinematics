@@ -1,4 +1,3 @@
-
 pub mod euler_utils;
 pub mod kinematics;
 #[cfg(feature = "python")]

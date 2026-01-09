@@ -1,11 +1,9 @@
-
 // WASM bindings (enabled with "wasm" feature)
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use super::kinematics::{Kinematics};
-use nalgebra::{Matrix4};
-
+use super::kinematics::Kinematics;
+use nalgebra::Matrix4;
 
 // ============================================================================
 // WASM Bindings
@@ -21,10 +19,10 @@ pub struct WasmKinematics {
 #[wasm_bindgen]
 impl WasmKinematics {
     /// Create a new kinematics solver from JSON string
-    /// 
+    ///
     /// # Arguments
     /// * `json_data` - JSON configuration as a string (fetch from file in JS)
-    /// 
+    ///
     /// # Returns
     /// WasmKinematics instance or error
     #[wasm_bindgen(constructor)]
@@ -36,11 +34,11 @@ impl WasmKinematics {
     }
 
     /// Inverse kinematics: calculate joint angles from platform pose
-    /// 
+    ///
     /// # Arguments
     /// * `t_world_platform` - 4x4 transformation matrix as flat array (16 floats, row-major)
     /// * `body_yaw` - Optional body yaw angle in radians (pass NaN for None)
-    /// 
+    ///
     /// # Returns
     /// Array of 6 joint angles in radians
     #[wasm_bindgen(js_name = inverseKinematics)]
@@ -73,22 +71,25 @@ impl WasmKinematics {
         } else {
             Some(body_yaw)
         };
-        
-        self.inner.inverse_kinematics(t_world_platform, body_yaw_opt)
+
+        self.inner
+            .inverse_kinematics(t_world_platform, body_yaw_opt)
     }
 
     /// Forward kinematics: calculate platform pose from joint angles
-    /// 
+    ///
     /// # Arguments
     /// * `joint_angles` - Array of 6 joint angles in radians
     /// * `body_yaw` - Optional body yaw angle in radians (pass NaN for None)
-    /// 
+    ///
     /// # Returns
     /// 4x4 transformation matrix as flat array (16 floats, row-major)
     #[wasm_bindgen(js_name = forwardKinematics)]
     pub fn forward_kinematics(&mut self, joint_angles: &[f64], body_yaw: f64) -> Vec<f64> {
         if joint_angles.len() != 6 {
-            return vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+            return vec![
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ];
         }
 
         let body_yaw_opt = if body_yaw.is_nan() {
@@ -97,22 +98,36 @@ impl WasmKinematics {
             Some(body_yaw)
         };
 
-        let t = self.inner.forward_kinematics(joint_angles.to_vec(), body_yaw_opt);
+        let t = self
+            .inner
+            .forward_kinematics(joint_angles.to_vec(), body_yaw_opt);
 
         vec![
-            t[(0, 0)], t[(0, 1)], t[(0, 2)], t[(0, 3)],
-            t[(1, 0)], t[(1, 1)], t[(1, 2)], t[(1, 3)],
-            t[(2, 0)], t[(2, 1)], t[(2, 2)], t[(2, 3)],
-            t[(3, 0)], t[(3, 1)], t[(3, 2)], t[(3, 3)],
+            t[(0, 0)],
+            t[(0, 1)],
+            t[(0, 2)],
+            t[(0, 3)],
+            t[(1, 0)],
+            t[(1, 1)],
+            t[(1, 2)],
+            t[(1, 3)],
+            t[(2, 0)],
+            t[(2, 1)],
+            t[(2, 2)],
+            t[(2, 3)],
+            t[(3, 0)],
+            t[(3, 1)],
+            t[(3, 2)],
+            t[(3, 3)],
         ]
     }
 
     /// Calculate passive joint angles from head joints and head pose
-    /// 
+    ///
     /// # Arguments
     /// * `head_joints` - Array of 7 floats: [yaw_body, stewart_1, ..., stewart_6]
     /// * `head_pose` - 4x4 transformation matrix as flat array (16 floats, row-major)
-    /// 
+    ///
     /// # Returns
     /// Array of 21 floats: passive joint angles [p1_x, p1_y, p1_z, ..., p7_x, p7_y, p7_z]
     #[wasm_bindgen(js_name = calculatePassiveJoints)]
@@ -129,11 +144,12 @@ impl WasmKinematics {
             [head_pose[12], head_pose[13], head_pose[14], head_pose[15]],
         ];
 
-        self.inner.calculate_passive_joints(head_joints, &head_pose_matrix)
+        self.inner
+            .calculate_passive_joints(head_joints, &head_pose_matrix)
     }
 
     /// Reset forward kinematics to a specific platform pose
-    /// 
+    ///
     /// # Arguments
     /// * `t_world_platform` - 4x4 transformation matrix as flat array (16 floats, row-major)
     #[wasm_bindgen(js_name = resetForwardKinematics)]
@@ -165,13 +181,13 @@ impl WasmKinematics {
     }
 
     /// Safe inverse kinematics with limits
-    /// 
+    ///
     /// # Arguments
     /// * `t_world_platform` - 4x4 transformation matrix as flat array (16 floats, row-major)
     /// * `body_yaw` - Optional body yaw angle in radians (pass NaN for None)
     /// * `max_relative_yaw` - Optional max relative yaw limit (pass NaN for None)
     /// * `max_body_yaw` - Optional max body yaw limit (pass NaN for None)
-    /// 
+    ///
     /// # Returns
     /// Array of 7 values: [body_yaw_target, stewart_1, ..., stewart_6]
     #[wasm_bindgen(js_name = inverseKinematicsSafe)]
@@ -181,7 +197,7 @@ impl WasmKinematics {
         body_yaw: f64,
         max_relative_yaw: f64,
         max_body_yaw: f64,
-        max_lean_angle: f64
+        max_lean_angle: f64,
     ) -> Vec<f64> {
         if t_world_platform.len() != 16 {
             return vec![0.0; 7];
@@ -206,12 +222,34 @@ impl WasmKinematics {
             t_world_platform[15],
         );
 
-        let body_yaw_opt = if body_yaw.is_nan() { None } else { Some(body_yaw) };
-        let max_rel_yaw_opt = if max_relative_yaw.is_nan() { None } else { Some(max_relative_yaw) };
-        let max_body_yaw_opt = if max_body_yaw.is_nan() { None } else { Some(max_body_yaw) };
-        let max_lean_angle_opt = if max_lean_angle.is_nan() { None } else { Some(max_lean_angle) };
+        let body_yaw_opt = if body_yaw.is_nan() {
+            None
+        } else {
+            Some(body_yaw)
+        };
+        let max_rel_yaw_opt = if max_relative_yaw.is_nan() {
+            None
+        } else {
+            Some(max_relative_yaw)
+        };
+        let max_body_yaw_opt = if max_body_yaw.is_nan() {
+            None
+        } else {
+            Some(max_body_yaw)
+        };
+        let max_lean_angle_opt = if max_lean_angle.is_nan() {
+            None
+        } else {
+            Some(max_lean_angle)
+        };
 
-        self.inner.inverse_kinematics_safe(t, body_yaw_opt, max_rel_yaw_opt, max_body_yaw_opt, max_lean_angle_opt)
+        self.inner.inverse_kinematics_safe(
+            t,
+            body_yaw_opt,
+            max_rel_yaw_opt,
+            max_body_yaw_opt,
+            max_lean_angle_opt,
+        )
     }
 }
 

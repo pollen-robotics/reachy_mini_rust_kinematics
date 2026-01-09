@@ -47,7 +47,7 @@ fn main() {
             branch_position,
             T_motor_world.try_inverse().unwrap(),
             solution,
-            None
+            None,
         );
     }
 

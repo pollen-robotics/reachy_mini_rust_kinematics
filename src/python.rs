@@ -1,5 +1,5 @@
+use super::kinematics::{HEAD_Z_OFFSET, Kinematics, MOTOR_ARM_LENGTH, STEWARD_ROD_LENGTH};
 use nalgebra::{Matrix4, Vector3};
-use super::kinematics::{Kinematics, HEAD_Z_OFFSET, MOTOR_ARM_LENGTH, STEWARD_ROD_LENGTH};
 
 // Python bindings (enabled with "python" feature, which is default)
 #[cfg(feature = "python")]
@@ -9,7 +9,6 @@ use pyo3_stub_gen::{
     define_stub_info_gatherer,
     derive::{gen_stub_pyclass, gen_stub_pymethods},
 };
-
 
 #[cfg(feature = "python")]
 #[gen_stub_pyclass]
@@ -23,7 +22,12 @@ struct ReachyMiniRustKinematics {
 impl ReachyMiniRustKinematics {
     #[new]
     #[pyo3(signature = (motor_arm_length=None, rod_length=None, head_z_offset=None, json_file_path=None))]
-    fn new(motor_arm_length: Option<f64>, rod_length: Option<f64>, head_z_offset: Option<f64>, json_file_path: Option<String>) -> Self {
+    fn new(
+        motor_arm_length: Option<f64>,
+        rod_length: Option<f64>,
+        head_z_offset: Option<f64>,
+        json_file_path: Option<String>,
+    ) -> Self {
         if let Some(json_file_path) = json_file_path {
             if json_file_path != "" {
                 let kinematics = Kinematics::from_json_file(&json_file_path).unwrap();
@@ -36,7 +40,11 @@ impl ReachyMiniRustKinematics {
         let rod_length = rod_length.unwrap_or(STEWARD_ROD_LENGTH);
         let head_z_offset = head_z_offset.unwrap_or(HEAD_Z_OFFSET);
         Self {
-            inner: std::sync::Mutex::new(Kinematics::new(motor_arm_length, rod_length, head_z_offset)),
+            inner: std::sync::Mutex::new(Kinematics::new(
+                motor_arm_length,
+                rod_length,
+                head_z_offset,
+            )),
         }
     }
 
@@ -145,7 +153,7 @@ impl ReachyMiniRustKinematics {
         body_yaw: Option<f64>,
         max_relative_yaw: Option<f64>,
         max_body_yaw: Option<f64>,
-        max_lean_angle: Option<f64>
+        max_lean_angle: Option<f64>,
     ) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
@@ -170,7 +178,7 @@ impl ReachyMiniRustKinematics {
             body_yaw,
             max_relative_yaw,
             max_body_yaw,
-            max_lean_angle
+            max_lean_angle,
         )
     }
 
@@ -217,7 +225,6 @@ impl ReachyMiniRustKinematics {
             .unwrap()
     }
 }
-
 
 // ============================================================================
 // Python Bindings
