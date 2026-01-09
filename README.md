@@ -4,7 +4,7 @@ Translation of https://github.com/pollen-robotics/reachy_mini_cpp_kinematics
 
 Analytical Inverse Kinematics, Numerical Forward Kinematics
 
-## To install locally 
+## To install locally  
 ```bash
 pip install maturin
 ```
