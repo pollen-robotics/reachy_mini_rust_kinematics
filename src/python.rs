@@ -65,7 +65,7 @@ impl ReachyMiniRustKinematics {
         self.inner
             .lock()
             .unwrap()
-            .add_branch(branch_platform, t_world_motor, solution);
+            .add_branch(branch_platform, t_world_motor, solution, None);
     }
 
     #[pyo3(signature = (t_world_platform, body_yaw=None))]
@@ -138,13 +138,14 @@ impl ReachyMiniRustKinematics {
         ]
     }
 
-    #[pyo3(signature = (t_world_platform, body_yaw=None, max_relative_yaw=None, max_body_yaw=None))]
+    #[pyo3(signature = (t_world_platform, body_yaw=None, max_relative_yaw=None, max_body_yaw=None, max_lean_angle=Some(0.78)))]
     fn inverse_kinematics_safe(
         &self,
         t_world_platform: [[f64; 4]; 4],
         body_yaw: Option<f64>,
         max_relative_yaw: Option<f64>,
         max_body_yaw: Option<f64>,
+        max_lean_angle: Option<f64>
     ) -> Vec<f64> {
         let t_world_platform = Matrix4::new(
             t_world_platform[0][0],
@@ -169,6 +170,7 @@ impl ReachyMiniRustKinematics {
             body_yaw,
             max_relative_yaw,
             max_body_yaw,
+            max_lean_angle
         )
     }
 

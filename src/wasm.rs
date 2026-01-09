@@ -181,6 +181,7 @@ impl WasmKinematics {
         body_yaw: f64,
         max_relative_yaw: f64,
         max_body_yaw: f64,
+        max_lean_angle: f64
     ) -> Vec<f64> {
         if t_world_platform.len() != 16 {
             return vec![0.0; 7];
@@ -208,8 +209,9 @@ impl WasmKinematics {
         let body_yaw_opt = if body_yaw.is_nan() { None } else { Some(body_yaw) };
         let max_rel_yaw_opt = if max_relative_yaw.is_nan() { None } else { Some(max_relative_yaw) };
         let max_body_yaw_opt = if max_body_yaw.is_nan() { None } else { Some(max_body_yaw) };
+        let max_lean_angle_opt = if max_lean_angle.is_nan() { None } else { Some(max_lean_angle) };
 
-        self.inner.inverse_kinematics_safe(t, body_yaw_opt, max_rel_yaw_opt, max_body_yaw_opt)
+        self.inner.inverse_kinematics_safe(t, body_yaw_opt, max_rel_yaw_opt, max_body_yaw_opt, max_lean_angle_opt)
     }
 }
 

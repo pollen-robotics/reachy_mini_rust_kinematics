@@ -2,7 +2,10 @@ use nalgebra::{DVector, Matrix3, Matrix3x6, Matrix4, MatrixXx6, Vector3};
 use serde::Deserialize;
 use std::fs;
 
-use super::euler_utils::{align_vectors, euler_from_rotation_xyz, rotation_from_euler_xyz};
+use super::euler_utils::{
+    align_vectors, euler_from_rotation_xyz, rotation_from_euler_xyz, euler_from_rotation_zyz,
+    rotation_from_euler_zyz,
+};
 
 pub const HEAD_Z_OFFSET: f64 = 0.177;
 pub const STEWARD_ROD_LENGTH: f64 = 0.09;
@@ -14,6 +17,7 @@ struct Branch {
     t_world_motor: Matrix4<f64>,
     solution: f64,
     jacobian: Matrix3x6<f64>,
+    limits: Option<(f64, f64)>,
 }
 
 
@@ -23,6 +27,7 @@ struct Motor {
     branch_position: Vec<f64>,
     T_motor_world: Vec<Vec<f64>>,
     solution: f64,
+    limits: Vec<f64>,
 }
 
 
@@ -97,6 +102,7 @@ impl Kinematics {
         branch_platform: Vector3<f64>,
         t_world_motor: Matrix4<f64>,
         solution: f64,
+        limits: Option<(f64, f64)>,
     ) {
         // Building a 3x6 jacobian relating platform velocity to branch anchor point
         // linear velocity Linear velocity is kept as identity and angular velocity is
@@ -120,6 +126,7 @@ impl Kinematics {
             t_world_motor,
             solution,
             jacobian,
+            limits,
         });
     }
 
@@ -144,23 +151,34 @@ impl Kinematics {
 
     pub fn inverse_kinematics_safe(
         &mut self,
-        t_world_platform: Matrix4<f64>,
+    t_world_platform: Matrix4<f64>,
         body_yaw: Option<f64>,
         max_relative_yaw: Option<f64>,
         max_body_yaw: Option<f64>,
+        max_lean_angle: Option<f64>,
     ) -> Vec<f64> {
         let mut joint_angles: Vec<f64> = vec![0.0; self.branches.len() + 1];
         let mut body_yaw_target = 0.0;
+
         // if body yaw is specified, rotate the platform accordingly
         if body_yaw.is_some() {
             body_yaw_target = -body_yaw.unwrap();
             // first verify if the body yaw is within the allowed limits
             // relative yaw is the yaw difference between the current platform yaw and body yaw
-            // it should stays within +/- max_relative_yaw
+            // it should stay within +/- max_relative_yaw
             if let Some(max_rel_yaw) = max_relative_yaw {
+                let z_pos = t_world_platform[(2, 3)] - self.head_z_offset;
+                let mut max_rel_yaw_adapt = max_rel_yaw;
+                // reduce progressively max_relative_yaw to 0 at - 4cm
+                if (z_pos < 0.0) && (z_pos >= -0.04 ){
+                    max_rel_yaw_adapt = (0.04 + z_pos)/0.04 * max_rel_yaw;
+                }else if z_pos < -0.04 {
+                    max_rel_yaw_adapt = 0.0;
+                }
+
                 let current_yaw = t_world_platform[(0, 1)].atan2(t_world_platform[(0, 0)]);
                 let relative_yaw = body_yaw_target - current_yaw;
-                body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw, max_rel_yaw);
+                body_yaw_target = current_yaw + relative_yaw.clamp(-max_rel_yaw_adapt, max_rel_yaw_adapt);
             }
             // then clamp the body yaw within +/- max_body_yaw
             // this is physically limited by the mechanical design
@@ -170,10 +188,41 @@ impl Kinematics {
             body_yaw_target = -body_yaw_target;
         }
 
+        // Extract rotation from platform transform and convert to ZYZ Euler angles
+        let mut t_world_platform_clamped = t_world_platform;
+        if let Some(max_angle) = max_lean_angle {
+            // Extract 3x3 rotation matrix from 4x4 transform
+            let rotation = t_world_platform.fixed_view::<3, 3>(0, 0).into_owned();
+            // Convert to ZYZ Euler angles
+            let mut euler_angles = euler_from_rotation_zyz(&rotation);
+            
+            // Clamp the middle angle (beta) within [-max_angle, max_angle]
+            euler_angles[1] = euler_angles[1].clamp(-max_angle, max_angle);
+            
+            // Convert back to rotation matrix
+            let clamped_rotation = rotation_from_euler_zyz(euler_angles[0], euler_angles[1], euler_angles[2]);
+            
+            // Update the transform with the clamped rotation
+            for i in 0..3 {
+                for j in 0..3 {
+                    t_world_platform_clamped[(i, j)] = clamped_rotation[(i, j)];
+                }
+            }
+        }
+        
         // construct the joint angles vector
         joint_angles[0] = body_yaw_target;
         joint_angles[1..]
-            .copy_from_slice(&self.inverse_kinematics(t_world_platform, Some(body_yaw_target)));
+            .copy_from_slice(&self.inverse_kinematics(t_world_platform_clamped, Some(body_yaw_target)));
+        
+        
+        // clamp each joint angle within its limits if specified
+        for (i, branch) in self.branches.iter().enumerate() {
+            if let Some((min_limit, max_limit)) = branch.limits {
+                joint_angles[i + 1] = joint_angles[i + 1].clamp(min_limit, max_limit);
+            }
+        }
+        
         joint_angles
     }
 
@@ -427,10 +476,17 @@ impl Kinematics {
                 motor.T_motor_world[3][3],
             );
             let solution = if motor.solution != 0.0 { 1.0 } else { -1.0 };
+
+            let mut limits = None;
+            if motor.limits.len() == 2 {
+                limits = Some((motor.limits[0], motor.limits[1]));
+            }
+
             kinematics.add_branch(
                 branch_position,
                 t_motor_world.try_inverse().unwrap(),
                 solution,
+                limits
             );
         }
 

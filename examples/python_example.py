@@ -77,7 +77,8 @@ def main():
         t_world_platform,
         body_yaw,
         max_relative_yaw,
-        max_body_yaw
+        max_body_yaw,
+        0.707
     )
     print(f"Safe IK result (7 values): {result}\n")
 
