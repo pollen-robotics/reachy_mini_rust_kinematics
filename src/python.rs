@@ -3,15 +3,14 @@ use nalgebra::{Matrix4, Vector3};
 
 // Python bindings (enabled with "python" feature, which is default)
 #[cfg(feature = "python")]
-use pyo3::prelude::*; 
+use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::gen_stub_pyclass};
 #[cfg(feature = "python")]
-//use pyo3_stub_gen::derive::gen_stub_pymethods; 
-// TODO re-eanble when pyo3_stub_gen supports cfg attributes on methods 
+//use pyo3_stub_gen::derive::gen_stub_pymethods;
+// TODO re-eanble when pyo3_stub_gen supports cfg attributes on methods
 // it is supported for Cpython and pypy, but there is no relaiable way to detect which one is being used at stub generation time
 // so we disable it for now
-
 #[cfg(feature = "python")]
 #[gen_stub_pyclass]
 #[pyclass(frozen)]
