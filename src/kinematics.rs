@@ -200,7 +200,6 @@ impl Kinematics {
             // Convert back to rotation matrix
             let clamped_rotation =
                 rotation_from_euler_zyz(euler_angles[0], euler_angles[1], euler_angles[2]);
-
             // Update the transform with the clamped rotation
             for i in 0..3 {
                 for j in 0..3 {
@@ -221,7 +220,6 @@ impl Kinematics {
                 joint_angles[i + 1] = joint_angles[i + 1].clamp(min_limit, max_limit);
             }
         }
-
         joint_angles
     }
 
@@ -312,81 +310,127 @@ impl Kinematics {
             panic!("Forward kinematics requires exactly 6 joint angles");
         }
 
-        let mut J = MatrixXx6::<f64>::zeros(6);
-        let mut errors = DVector::<f64>::zeros(6);
-        let mut arms_motor: Vec<Vector3<f64>> = Vec::new();
+        let mut found_solution: bool = false;
+        let mut tries_left = 5;
 
-        for k in 0..self.branches.len() {
-            let branch = &self.branches[k];
+        while !found_solution && tries_left > 0 {
+            tries_left -= 1;
+            found_solution = true;
 
-            // Computing the position of motor arm in the motor frame
-            let arm_motor = self.motor_arm_length
-                * Vector3::new(joint_angles[k].cos(), joint_angles[k].sin(), 0.0);
-            arms_motor.push(arm_motor);
+            let mut J = MatrixXx6::<f64>::zeros(6);
+            let mut errors = DVector::<f64>::zeros(6);
+            let mut arms_motor: Vec<Vector3<f64>> = Vec::new();
 
-            // Expressing the tip of motor arm in the platform frame
-            // Convert arm_motor to homogeneous coordinates for multiplication
-            let arm_motor_hom = arm_motor.push(1.0);
-            let arm_platform_hom =
-                self.t_world_platform.try_inverse().unwrap() * branch.t_world_motor * arm_motor_hom;
-            let arm_platform = arm_platform_hom.fixed_rows::<3>(0).into_owned();
+            for k in 0..self.branches.len() {
+                let branch = &self.branches[k];
 
-            // Computing the current distance
-            let current_distance = (arm_platform - branch.branch_platform).norm();
+                // Computing the position of motor arm in the motor frame
+                let arm_motor = self.motor_arm_length
+                    * Vector3::new(joint_angles[k].cos(), joint_angles[k].sin(), 0.0);
+                arms_motor.push(arm_motor);
 
-            // Computing the arm-to-branch vector in platform frame
-            let arm_branch_platform: Vector3<f64> = branch.branch_platform - arm_platform;
+                // Expressing the tip of motor arm in the platform frame
+                // Convert arm_motor to homogeneous coordinates for multiplication
+                let arm_motor_hom = arm_motor.push(1.0);
+                let arm_platform_hom = self.t_world_platform.try_inverse().unwrap()
+                    * branch.t_world_motor
+                    * arm_motor_hom;
+                let arm_platform = arm_platform_hom.fixed_rows::<3>(0).into_owned();
 
-            // Computing the jacobian of the distance
-            let mut slice = J.view_mut((k, 0), (1, 6));
-            slice += arm_branch_platform.transpose() * branch.jacobian;
-            errors[k] = self.rod_length - current_distance;
-        }
+                // Computing the current distance
+                let current_distance = (arm_platform - branch.branch_platform).norm();
 
-        // If the error is sufficiently high, performs a line-search along the direction given by the jacobian inverse
-        if errors.norm() > 1e-6 {
-            let mut V = J.pseudo_inverse(1e-6).unwrap() * errors.clone();
-            for _i in 0..self.line_search_maximum_iterations {
-                let mut T: Matrix4<f64> = Matrix4::identity();
-                T[(0, 3)] = V[0];
-                T[(1, 3)] = V[1];
-                T[(2, 3)] = V[2];
+                // Computing the arm-to-branch vector in platform frame
+                let arm_branch_platform: Vector3<f64> = branch.branch_platform - arm_platform;
 
-                let norm = V.fixed_rows::<3>(3).norm();
-                if norm.abs() > 1e-6 {
-                    let tail = V.fixed_rows::<3>(3).normalize();
-                    let axis = nalgebra::Unit::new_normalize(tail);
-                    let rotation = nalgebra::Rotation3::from_axis_angle(&axis, norm);
-                    let linear = rotation.matrix();
-                    let mut slice = T.view_mut((0, 0), (3, 3));
-                    slice.copy_from(linear);
-                }
-                let t_world_platform2 = self.t_world_platform * T;
+                // Computing the jacobian of the distance
+                let mut slice = J.view_mut((k, 0), (1, 6));
+                slice += arm_branch_platform.transpose() * branch.jacobian;
+                errors[k] = self.rod_length - current_distance;
+            }
 
-                let mut new_errors = DVector::<f64>::zeros(self.branches.len());
-                for k in 0..self.branches.len() {
-                    let branch = &self.branches[k];
+            // If the error is sufficiently high, performs a line-search along the direction given by the jacobian inverse
+            if errors.norm() > 1e-6 {
+                let mut V = J.pseudo_inverse(1e-6).unwrap() * errors.clone();
+                for _i in 0..self.line_search_maximum_iterations {
+                    let mut T: Matrix4<f64> = Matrix4::identity();
+                    T[(0, 3)] = V[0];
+                    T[(1, 3)] = V[1];
+                    T[(2, 3)] = V[2];
 
-                    let arm_motor_hom = arms_motor[k].push(1.0);
-                    let arm_platform_hom = t_world_platform2.try_inverse().unwrap()
-                        * branch.t_world_motor
-                        * arm_motor_hom;
-                    let arm_platform = arm_platform_hom.fixed_rows::<3>(0).into_owned();
-                    let current_distance = (arm_platform - branch.branch_platform).norm();
+                    let norm = V.fixed_rows::<3>(3).norm();
+                    if norm.abs() > 1e-6 {
+                        let tail = V.fixed_rows::<3>(3).normalize();
+                        let axis = nalgebra::Unit::new_normalize(tail);
+                        let rotation = nalgebra::Rotation3::from_axis_angle(&axis, norm);
+                        let linear = rotation.matrix();
+                        let mut slice = T.view_mut((0, 0), (3, 3));
+                        slice.copy_from(linear);
+                    }
+                    let t_world_platform2 = self.t_world_platform * T;
 
-                    new_errors[k] = self.rod_length - current_distance;
-                }
+                    let mut new_errors = DVector::<f64>::zeros(self.branches.len());
+                    for k in 0..self.branches.len() {
+                        let branch = &self.branches[k];
 
-                if new_errors.norm() < errors.norm() {
-                    self.t_world_platform = t_world_platform2;
-                    break;
-                } else {
-                    for j in 0..V.len() {
-                        V[j] *= 0.5;
+                        let arm_motor_hom = arms_motor[k].push(1.0);
+                        let arm_platform_hom = t_world_platform2.try_inverse().unwrap()
+                            * branch.t_world_motor
+                            * arm_motor_hom;
+                        let arm_platform = arm_platform_hom.fixed_rows::<3>(0).into_owned();
+                        let current_distance = (arm_platform - branch.branch_platform).norm();
+
+                        new_errors[k] = self.rod_length - current_distance;
+                    }
+
+                    if new_errors.norm() < errors.norm() {
+                        self.t_world_platform = t_world_platform2;
+                        break;
+                    } else {
+                        for j in 0..V.len() {
+                            V[j] *= 0.5;
+                        }
                     }
                 }
             }
+
+            // if the head is lower than 7cm below the initial position,
+            // or if the head orientation is too extreme (looking down or rotated more than 80 degrees)
+            // or if the head yaw is more than 100 degrees from the body yaw
+            // RETRY with a small random orientation offset
+            let eulers = euler_from_rotation_xyz(
+                &self.t_world_platform.fixed_view::<3, 3>(0, 0).into_owned(),
+            );
+            let b_yaw = body_yaw.unwrap_or(0.0);
+            if self.t_world_platform[(2, 3)] < 0.07
+                || eulers[0].abs() > 1.4
+                || eulers[1].abs() > 1.4
+                || (eulers[2] - b_yaw).abs() > 2.5
+            {
+                // Use retry counter for variation
+                let t = eulers[0] * 12563.618033988749895; // golden ratio for better distribution
+                let x = 0.2 * (t * 32.1).sin() - 0.1;
+                let y = 0.2 * (t * 43.7).cos() - 0.1;
+                let z = 0.2 * (t * 15.3).sin() - 0.1 + b_yaw;
+                let mut T_new =
+                    Matrix4::new_translation(&Vector3::new(0.0, 0.0, self.head_z_offset));
+                if self.t_world_platform[(2, 3)] < 0.07 {
+                    T_new[(2, 3)] -= 0.02; // a heuristic to help convergence when too low
+                }
+                let mut slice = T_new.view_mut((0, 0), (3, 3));
+                slice.copy_from(&rotation_from_euler_xyz(x, y, z).fixed_view::<3, 3>(0, 0));
+                self.reset_forward_kinematics(T_new);
+                eprintln!(
+                    "Retrying forward kinematics with orientation offset ({:.3}, {:.3}, {:.3}), tries left: {}",
+                    x, y, z, tries_left
+                );
+                found_solution = false;
+            }
         }
+
+        // if (tries_left == 0) && !found_solution {
+        //     panic!("ERRORL forward kinematics did not converge after maximum retries.");
+        // }
 
         // prepare the retun value by applying body yaw if specified
         let mut t_world_platform = self.t_world_platform;
