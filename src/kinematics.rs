@@ -70,6 +70,7 @@ pub struct Kinematics {
     line_search_maximum_iterations: usize,
     branches: Vec<Branch>,
     passives: PassiveKinematics,
+    last_ik_t_world_platform: Matrix4<f64>,
 }
 
 impl Kinematics {
@@ -91,6 +92,7 @@ impl Kinematics {
             line_search_maximum_iterations,
             branches,
             passives,
+            last_ik_t_world_platform: t_world_platform,
         }
     }
 
@@ -245,6 +247,9 @@ impl Kinematics {
             t_world_platform_target = t_yaw * t_world_platform;
         }
 
+        // save the last ik platform target for the FK reinit if necessary
+        self.last_ik_t_world_platform = t_world_platform_target;
+
         for (k, branch) in self.branches.iter().enumerate() {
             let t_world_motor_inv = branch.t_world_motor.try_inverse().unwrap();
             let branch_motor = t_world_motor_inv
@@ -311,7 +316,7 @@ impl Kinematics {
         }
 
         let mut found_solution: bool = false;
-        let mut tries_left = 5;
+        let mut tries_left = 2;
 
         while !found_solution && tries_left > 0 {
             tries_left -= 1;
@@ -397,40 +402,32 @@ impl Kinematics {
             // if the head is lower than 7cm below the initial position,
             // or if the head orientation is too extreme (looking down or rotated more than 80 degrees)
             // or if the head yaw is more than 100 degrees from the body yaw
-            // RETRY with a small random orientation offset
+            // RETRY with the last ik target pose as initial pose for fk
             let eulers = euler_from_rotation_xyz(
                 &self.t_world_platform.fixed_view::<3, 3>(0, 0).into_owned(),
             );
-            let b_yaw = body_yaw.unwrap_or(0.0);
+            let head_yaw = eulers[2]; // yaw
+            let eulers = euler_from_rotation_zyz(
+                &self.t_world_platform.fixed_view::<3, 3>(0, 0).into_owned(),
+            );
+            let lean_angle = eulers[1]; // y angle
+            // conditions for retry:
+            // head too low (< 7cm)
+            // head looking back too much (yaw > 90 degrees)
+            // roll/pitch too high (lean angle > 80 degrees)
             if self.t_world_platform[(2, 3)] < 0.07
-                || eulers[0].abs() > 1.4
-                || eulers[1].abs() > 1.4
-                || (eulers[2] - b_yaw).abs() > 2.5
+                || lean_angle.abs() > 1.4
+                || head_yaw.abs() > 1.57
             {
-                // Use retry counter for variation
-                let t = eulers[0] * 12563.618033988749895; // golden ratio for better distribution
-                let x = 0.2 * (t * 32.1).sin() - 0.1;
-                let y = 0.2 * (t * 43.7).cos() - 0.1;
-                let z = 0.2 * (t * 15.3).sin() - 0.1 + b_yaw;
-                let mut T_new =
-                    Matrix4::new_translation(&Vector3::new(0.0, 0.0, self.head_z_offset));
-                if self.t_world_platform[(2, 3)] < 0.07 {
-                    T_new[(2, 3)] -= 0.02; // a heuristic to help convergence when too low
-                }
-                let mut slice = T_new.view_mut((0, 0), (3, 3));
-                slice.copy_from(&rotation_from_euler_xyz(x, y, z).fixed_view::<3, 3>(0, 0));
-                self.reset_forward_kinematics(T_new);
-                eprintln!(
-                    "Retrying forward kinematics with orientation offset ({:.3}, {:.3}, {:.3}), tries left: {}",
-                    x, y, z, tries_left
-                );
+                self.reset_forward_kinematics(self.last_ik_t_world_platform);
+                println!("Retrying forward kinematics with the last IK target pose as initial pose");
                 found_solution = false;
             }
         }
 
-        // if (tries_left == 0) && !found_solution {
-        //     panic!("ERRORL forward kinematics did not converge after maximum retries.");
-        // }
+        if (tries_left == 0) && !found_solution {
+            panic!("ERRORL forward kinematics did not converge after maximum retries.");
+        }
 
         // prepare the retun value by applying body yaw if specified
         let mut t_world_platform = self.t_world_platform;
