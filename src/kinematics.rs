@@ -420,7 +420,9 @@ impl Kinematics {
                 || head_yaw.abs() > 1.57
             {
                 self.reset_forward_kinematics(self.last_ik_t_world_platform);
-                println!("Retrying forward kinematics with the last IK target pose as initial pose");
+                println!(
+                    "Retrying forward kinematics with the last IK target pose as initial pose"
+                );
                 found_solution = false;
             }
         }
