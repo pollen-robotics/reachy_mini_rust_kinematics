@@ -50,7 +50,7 @@ This will generate files in the `pkg/` directory.
 See [WASM_BUILD.md](WASM_BUILD.md)
 Also see an example in [examples](./examples/wasm_example.html)
 
-
+## Using the WASM module in JavaScript
 ```js
 import init, { WasmKinematics } from './pkg/reachy_mini_rust_kinematics.js'; //or './reachy-mini-js/reachy_mini_rust_kinematics.js'
 
