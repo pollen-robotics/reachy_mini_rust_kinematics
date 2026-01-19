@@ -1,17 +1,28 @@
 [package]
 name = "reachy_mini_rust_kinematics"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2024"
 
 [lib]
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-env_logger = "0.11.8"
 nalgebra = "0.32.3"
-pyo3 = "0.25.0"
-pyo3-log = "0.12.4"
-pyo3-stub-gen = "0.9.0"
-rust-numpy = "0.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# Python dependencies (default, excluded for WASM)
+pyo3 = { version = "0.25.0", optional = true }
+pyo3-log = { version = "0.12.4", optional = true }
+pyo3-stub-gen = { version = "0.9.0", optional = true }
+rust-numpy = { version = "0.1.0", optional = true }
+env_logger = { version = "0.11.8", optional = true }
+
+# WASM dependencies (only for wasm32 target)
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[features]
+default = ["python"]
+python = ["pyo3", "pyo3-log", "pyo3-stub-gen", "rust-numpy", "env_logger"]
+wasm = ["wasm-bindgen", "console_error_panic_hook"]
