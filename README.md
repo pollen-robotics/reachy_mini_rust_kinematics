@@ -21,37 +21,41 @@ cd `target/wheels`
 pip install reachy_mini_rust_kinematics...
 ```
 
-## Cross-compiling for Raspberry Pi Zero (from Ubuntu)
+## Cross-compiling for Raspberry Pi (from Ubuntu)
 
-The Pi Zero uses an ARMv6 processor. To cross-compile the pure Rust library (without Python bindings):
+The `--no-default-features` flag disables the `python` feature, which avoids the pyo3 dependency (requires a host Python).
 
-### 1. Install the toolchain
+### Pi Zero (32-bit, ARMv6)
 
 ```bash
 sudo apt install gcc-arm-linux-gnueabihf
 rustup target add arm-unknown-linux-gnueabihf
-```
-
-### 2. Build
-
-```bash
 cargo build --target arm-unknown-linux-gnueabihf --no-default-features --release
 ```
 
-The `--no-default-features` flag disables the `python` feature, which avoids the pyo3 dependency (requires a host Python).
+### Pi Zero 2 (64-bit, AArch64)
 
-### 3. Run benchmarks on the Pi
+```bash
+sudo apt install gcc-aarch64-linux-gnu
+rustup target add aarch64-unknown-linux-gnu
+cargo build --target aarch64-unknown-linux-gnu --no-default-features --release
+```
+
+### Running benchmarks on the Pi
 
 Cross-compile the benchmark binary without running it:
 
 ```bash
+# For Pi Zero:
 cargo bench --target arm-unknown-linux-gnueabihf --no-default-features --no-run
+# For Pi Zero 2 (64-bit):
+cargo bench --target aarch64-unknown-linux-gnu --no-default-features --no-run
 ```
 
 Then copy the binary and `motors.json` to the Pi and run:
 
 ```bash
-scp target/arm-unknown-linux-gnueabihf/release/deps/kinematics_bench-* pi@<pi-ip>:~/
+scp target/<target>/release/deps/kinematics_bench-* pi@<pi-ip>:~/
 scp motors.json pi@<pi-ip>:~/
 ssh pi@<pi-ip> ./kinematics_bench-* --bench
 ```
