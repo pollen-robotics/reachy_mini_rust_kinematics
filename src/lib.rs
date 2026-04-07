@@ -1,5 +1,7 @@
 use nalgebra::{DVector, Matrix3, Matrix3x6, Matrix4, MatrixXx6, Vector3};
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
 use pyo3_stub_gen::{
     define_stub_info_gatherer,
     derive::{gen_stub_pyclass, gen_stub_pymethods},
@@ -8,12 +10,14 @@ use serde::Deserialize;
 
 const HEAD_Z_OFFSET: f64 = 0.177;
 
+#[cfg(feature = "python")]
 #[gen_stub_pyclass]
 #[pyclass(frozen)]
 struct ReachyMiniRustKinematics {
     inner: std::sync::Mutex<Kinematics>,
 }
 
+#[cfg(feature = "python")]
 #[gen_stub_pymethods]
 #[pymethods]
 impl ReachyMiniRustKinematics {
@@ -447,12 +451,14 @@ impl Kinematics {
     }
 }
 
+#[cfg(feature = "python")]
 #[pyo3::pymodule]
 fn reachy_mini_rust_kinematics(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ReachyMiniRustKinematics>()?;
     Ok(())
 }
 
+#[cfg(feature = "python")]
 define_stub_info_gatherer!(stub_info);
 
 #[cfg(test)]
